@@ -1,0 +1,25 @@
+###    API gateway HEALTH
+GET http://localhost:8080/health
+Accept: text/html
+
+
+###    Event-service HEALTH
+GET http://localhost:8082/health
+Accept: text/html
+
+###    Event-service events
+GET http://localhost:8082/events
+Accept: text/html
+
+
+
+
+###facade-service:8080 /events
+POST http://localhost:8080/facade_service
+Content-Type: application/json
+
+{
+  "msg": "msg10"
+}
+
+###
