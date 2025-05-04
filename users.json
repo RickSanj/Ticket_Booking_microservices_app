@@ -1,0 +1,10 @@
+{
+  "user@example.com": {
+    "hashed_password": "$2b$12$1UgQLbzEMK1AqP8tEJZ3DOAYy/GZ.RUdRhiOWO/MQszBOHwwAX6Ce",
+    "user_id": 1
+  },
+  "a@gmail.com": {
+    "hashed_password": "$2b$12$krztpw4r9vRxfngg8OBLZ.3YdSZXpTTgj5mXq9tO59zNvLo6XpIz6",
+    "user_id": 2
+  }
+}
