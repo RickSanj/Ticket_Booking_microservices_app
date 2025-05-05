@@ -1,37 +1,120 @@
 from flask import Flask, request, redirect, make_response, render_template_string, abort
 from passlib.hash import bcrypt
-import uuid, json, os
+import uuid
+import psycopg2
+import redis
 
 app = Flask(__name__)
 
-### sessions should be redis
-### here must be redis init
-os.makedirs("sessions", exist_ok=True)
+POSTGRES_DB_NAME = "autorization"
+POSTGRES_USER = "admin"
+POSTGRES_PASSWORD = "pass"
+POSTGRES_HOST = "localhost"
+POSTGRES_PORT = 5430
+
+REDIS_USERNAME = "user"
+REDIS_PASSWORD = "pass"
+REDIS_HOST = "localhost"
+REDIS_PORT = 6380
+
+# Postgres init
+postgres_connection = psycopg2.connect(database=POSTGRES_DB_NAME, user=POSTGRES_USER, password=POSTGRES_PASSWORD, host=POSTGRES_HOST, port=POSTGRES_PORT)
+cursor_connection = postgres_connection.cursor()
+
+# Redis init
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, username=REDIS_USERNAME, password=REDIS_PASSWORD)
+
+# Postgres Code
+def get_user_password(username):
+    password_request ="""
+    select
+        password
+    from
+        logging_password
+    where
+        login = %s
+    """
+
+    cursor_connection.execute(password_request, (username, ))
+
+    record = cursor_connection.fetchone()
+
+    return record[0]
+
+def get_user_id(username):
+    user_id_request ="""
+    select
+        user_id
+    from
+        logging_password
+    where
+        login = %s
+    """
+
+    cursor_connection.execute(user_id_request, (username, ))
+
+    record = cursor_connection.fetchone()
+
+    return record[0]
+
+def get_user_ids():
+    user_id_request ="""
+    select
+        user_id
+    from
+        logging_password
+    """
+
+    cursor_connection.execute(user_id_request)
+
+    record = cursor_connection.fetchone()
+
+    return record
+
+def register_user(username, password):
+    set_user_request = """INSERT INTO logging_password VALUES (%s, %s, %s);"""
+
+    new_id = max((get_user_ids()), default=0) + 1
+
+    cursor_connection.execute(set_user_request, (username, bcrypt.hash(password), new_id))
+
+    postgres_connection.commit()
+
+def check_user_existance(login):
+    password_request ="""
+    select
+        login
+    from
+        logging_password
+    where
+        login = %s
+    """
+
+    cursor_connection.execute(password_request, (login, ))
+
+    record = cursor_connection.fetchone()
+
+    return record is not None
 
 
-# instead of users we should have data in
-# postgres, here should be postgres init
-with open("users.json", "r") as f:
-    users = json.load(f)
-
-def create_session(user_id: int) -> str:
+# Redis code
+def create_userid_session(user_id: int) -> str:
     session_id = str(uuid.uuid4())
-    with open(f"sessions/{session_id}.json", "w") as f:
-        json.dump({"user_id": user_id}, f)
+
+    redis_client.set(session_id, user_id)
+
     return session_id
 
-def get_session(session_id: str):
-    try:
-        with open(f"sessions/{session_id}.json", "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
+def get_userid_session(session_id: str):
+    if not redis_client.exists(session_id):
         return None
 
-def delete_session(session_id: str):
-    try:
-        os.remove(f"sessions/{session_id}.json")
-    except FileNotFoundError:
-        pass
+    user_id = redis_client.get(session_id)
+
+    return user_id
+
+def delete_userid_session(session_id: str):
+    redis_client.delete(session_id)
 
 @app.route("/register", methods=["GET"])
 def register_form():
@@ -48,18 +131,10 @@ def register():
     email = request.form.get("email")
     password = request.form.get("password")
 
-    if email in users:
+    if check_user_existance(email):
         abort(400, "Email already registered")
 
-    hashed_pw = bcrypt.hash(password)
-    new_id = max((u.get("user_id", 0) for u in users.values()), default=0) + 1
-    users[email] = {
-        "hashed_password": hashed_pw,
-        "user_id": new_id
-    }
-
-    with open("users.json", "w") as f:
-        json.dump(users, f, indent=2)
+    register_user(email, password)
 
     return redirect("/login")
 
@@ -78,11 +153,11 @@ def login():
     email = request.form.get("email")
     password = request.form.get("password")
 
-    user = users.get(email)
-    if not user or not bcrypt.verify(password, user["hashed_password"]):
+    if not check_user_existance(email) or not bcrypt.verify(password, get_user_password(email)):
         abort(401, "Invalid credentials")
 
-    session_id = create_session(user["user_id"])
+    session_id = create_userid_session(get_user_id(email))
+
     resp = make_response(redirect("/main"))
     resp.set_cookie("session_id", session_id, httponly=True)
     return resp
@@ -93,17 +168,17 @@ def main():
     if not session_id:
         abort(401, "No session")
 
-    session = get_session(session_id)
+    session = get_userid_session(session_id)
     if not session:
         abort(401, "Invalid or expired session")
 
-    return f"Welcome user #{session['user_id']}!"
+    return f"Welcome user #{session}!"
 
 @app.route("/logout", methods=["GET"])
 def logout():
     session_id = request.cookies.get("session_id")
     if session_id:
-        delete_session(session_id)
+        delete_userid_session(session_id)
 
     resp = make_response(redirect("/login"))
     resp.delete_cookie("session_id")
