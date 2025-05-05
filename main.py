@@ -1,24 +1,18 @@
-from fastapi import FastAPI, Request, Form, Response, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
+from flask import Flask, request, redirect, make_response, render_template_string, abort
 from passlib.hash import bcrypt
 import uuid, json, os
 
-app = FastAPI()
+app = Flask(__name__)
 
+### sessions should be redis
+### here must be redis init
 os.makedirs("sessions", exist_ok=True)
 
+
+# instead of users we should have data in
+# postgres, here should be postgres init
 with open("users.json", "r") as f:
     users = json.load(f)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 def create_session(user_id: int) -> str:
     session_id = str(uuid.uuid4())
@@ -39,83 +33,81 @@ def delete_session(session_id: str):
     except FileNotFoundError:
         pass
 
-
-@app.get("/register", response_class=HTMLResponse)
+@app.route("/register", methods=["GET"])
 def register_form():
-    return """
+    return render_template_string("""
     <form action="/register" method="post">
       Email: <input type="email" name="email"><br>
       Password: <input type="password" name="password"><br>
       <input type="submit" value="Register">
     </form>
-    """
+    """)
 
-@app.post("/register")
-def register(email: str = Form(...), password: str = Form(...)):
+@app.route("/register", methods=["POST"])
+def register():
+    email = request.form.get("email")
+    password = request.form.get("password")
+
     if email in users:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        abort(400, "Email already registered")
 
-    # Hash password
     hashed_pw = bcrypt.hash(password)
-
-    # Simple ID generator (increment max existing ID)
     new_id = max((u.get("user_id", 0) for u in users.values()), default=0) + 1
-
-    # Save user in memory
     users[email] = {
         "hashed_password": hashed_pw,
         "user_id": new_id
     }
 
-    # Persist to file
     with open("users.json", "w") as f:
         json.dump(users, f, indent=2)
 
-    # Redirect to login
-    response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
-    return response
+    return redirect("/login")
 
-
-@app.get("/login", response_class=HTMLResponse)
+@app.route("/login", methods=["GET"])
 def login_form():
-    return """
+    return render_template_string("""
     <form action="/login" method="post">
       Email: <input type="email" name="email"><br>
       Password: <input type="password" name="password"><br>
       <input type="submit" value="Login">
     </form>
-    """
+    """)
 
-@app.post("/login")
-def login(email: str = Form(...), password: str = Form(...)):
+@app.route("/login", methods=["POST"])
+def login():
+    email = request.form.get("email")
+    password = request.form.get("password")
+
     user = users.get(email)
     if not user or not bcrypt.verify(password, user["hashed_password"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        abort(401, "Invalid credentials")
 
     session_id = create_session(user["user_id"])
+    resp = make_response(redirect("/main"))
+    resp.set_cookie("session_id", session_id, httponly=True)
+    return resp
 
-    response = RedirectResponse(url="/main", status_code=status.HTTP_302_FOUND)
-    response.set_cookie("session_id", session_id, httponly=True, secure=False)
-    return response
-
-@app.get("/main")
-def main(request: Request):
+@app.route("/main", methods=["GET"])
+def main():
     session_id = request.cookies.get("session_id")
     if not session_id:
-        raise HTTPException(status_code=401, detail="No session")
+        abort(401, "No session")
 
     session = get_session(session_id)
     if not session:
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
+        abort(401, "Invalid or expired session")
 
-    return {"message": f"Welcome user #{session['user_id']}!"}
+    return f"Welcome user #{session['user_id']}!"
 
-@app.get("/logout")
-def logout(request: Request):
+@app.route("/logout", methods=["GET"])
+def logout():
     session_id = request.cookies.get("session_id")
     if session_id:
         delete_session(session_id)
 
-    response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
-    response.delete_cookie("session_id")
-    return response
+    resp = make_response(redirect("/login"))
+    resp.delete_cookie("session_id")
+    return resp
+
+if __name__ == "__main__":
+    app.run(debug=True)
