@@ -67,16 +67,20 @@ def get_user_ids():
 
     cursor_connection.execute(user_id_request)
 
-    record = cursor_connection.fetchone()
+    record = cursor_connection.fetchall()
 
-    return record
+    return [value[0] for value in record] if record else []
 
 def register_user(username, password):
     set_user_request = """INSERT INTO logging_password VALUES (%s, %s, %s);"""
 
     new_id = max((get_user_ids()), default=0) + 1
 
-    cursor_connection.execute(set_user_request, (username, bcrypt.hash(password), new_id))
+    print(new_id)
+
+    hashed_password = bcrypt.hash(password)
+
+    cursor_connection.execute(set_user_request, (username, hashed_password, new_id))
 
     postgres_connection.commit()
 
@@ -105,7 +109,7 @@ def create_userid_session(user_id: int) -> str:
 
     return session_id
 
-def get_userid_session(session_id: str):
+def get_userid_by_session(session_id: str):
     if not redis_client.exists(session_id):
         return None
 
@@ -116,6 +120,8 @@ def get_userid_session(session_id: str):
 def delete_userid_session(session_id: str):
     redis_client.delete(session_id)
 
+
+# App code
 @app.route("/register", methods=["GET"])
 def register_form():
     return render_template_string("""
@@ -168,11 +174,11 @@ def main():
     if not session_id:
         abort(401, "No session")
 
-    session = get_userid_session(session_id)
-    if not session:
+    user_id = get_userid_by_session(session_id)
+    if not user_id:
         abort(401, "Invalid or expired session")
 
-    return f"Welcome user #{session}!"
+    return f"Welcome user #{user_id}!"
 
 @app.route("/logout", methods=["GET"])
 def logout():
