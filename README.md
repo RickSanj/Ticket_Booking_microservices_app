@@ -10,6 +10,6 @@ postgres 5432
 
 
 ## How to run
-docekr compose down
+docker compose down
 docker-compose build --no-cache
 docker compose up

@@ -4,8 +4,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 import os
 from datetime import datetime
+from custom_consul.consul_ import ConsulServiceRegistry
 
-from consul import ConsulServiceRegistry
 
 
 app = Flask(__name__)
@@ -106,8 +106,9 @@ def health():
 # -------------------- Entry Point --------------------
 
 def main():
-    consul = ConsulServiceRegistry(consul_host='localhost', consul_port=8500)
-
+    consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
+    consul.wait_for_consul()
+    
     service_name = "event-service"
     service_id = "event-service-1"
     service_port = 8082
@@ -121,6 +122,7 @@ def main():
         print(f"[Consul] Registered {service_name}")
     except Exception as e:
         print(f"[Consul Error] Failed to register: {e}")
+    app.run(host="0.0.0.0", port=8082)
 
 
 
@@ -128,4 +130,3 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     main()
-    app.run(host="0.0.0.0", port=8082)

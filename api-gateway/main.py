@@ -4,7 +4,11 @@ from events import events_bp
 from booking import booking_bp
 from payment import payment_bp
 
-from consul import ConsulServiceRegistry
+import sys
+import os
+
+from custom_consul.consul_ import ConsulServiceRegistry
+
 
 app = Flask(__name__)
 
@@ -24,22 +28,25 @@ def health():
 
 
 def main():
-    consul = ConsulServiceRegistry(consul_host='localhost', consul_port=8500)
+    consul = ConsulServiceRegistry()
+    consul.wait_for_consul()
 
-    service_name = "event-service"
-    service_id = "event-service-1"
-    service_port = 8082
-
+    service_name = "api-gateway"
+    service_id = "api-gateway-1"
+    service_port = 8080
+    print(f"Trying to Register {service_name}", flush=True)
     try:
         consul.register_service(
             service_name=service_name,
             service_id=service_id,
             port=service_port
         )
-        print(f"[Consul] Registered {service_name}")
+        print(f"[Consul] Registered {service_name}", flush=True)
     except Exception as e:
-        print(f"[Consul Error] Failed to register: {e}")
+        print(f"[Consul Error] Failed to register: {e}", flush=True)
+
+    app.run(host="0.0.0.0", port=service_port)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    main()

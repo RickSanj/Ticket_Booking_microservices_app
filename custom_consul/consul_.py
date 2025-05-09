@@ -1,10 +1,11 @@
 from consul import Consul, ConsulException
+import requests
 import socket
 import time
 
 
 class ConsulServiceRegistry:
-    def __init__(self, consul_host='localhost', consul_port=8500):
+    def __init__(self, consul_host='consul-server', consul_port=8500):
         """Initialize the Consul service registry."""
         self.consul = Consul(host=consul_host, port=consul_port)
         self.service_name = None
@@ -22,9 +23,12 @@ class ConsulServiceRegistry:
         """
         self.service_name = service_name
         self.service_id = service_id
+        
+        hostname = socket.gethostname()
+        ip_address = socket.gethostbyname(hostname)
 
         # Define the health check URL
-        health_check_url = f'http://localhost:{port}/health'
+        health_check_url = f'http://{ip_address}:{port}/health'
 
         # Register the service with a health check
         try:
@@ -90,3 +94,16 @@ class ConsulServiceRegistry:
             time.sleep(wait_interval)
         print(f"Service {service_name} not found after {max_retries} retries.")
         return []
+
+
+    def wait_for_consul(self, max_retries=10):
+        for _ in range(max_retries):
+            try:
+                r = requests.get("http://consul-server:8500/v1/status/leader")
+                if r.status_code == 200 and r.text != '""':
+                    print("Consul is ready")
+                    return True
+            except requests.exceptions.ConnectionError:
+                print("Waiting for Consul to start...")
+            time.sleep(5)
+        raise Exception("Consul did not start in time")
