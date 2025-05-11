@@ -13,20 +13,17 @@ Built with Docker, Kafka, Redis, Cassandra, Postgres, Consul. The system consist
 2. Event Management <br>
 - Admins can create, update, and delete events. <br>
 - All users can view events, including metadata like date, location, and ticket types. <br>
-3. Seat Management <br>
-- Seat Service must provide real-time availability for selected events. <br>
-- Users can select and lock seats during booking to avoid overbooking. <br>
-4. Booking Service <be>
+3. Booking Service <be>
 - Must provide real-time seat availability for the selected event. <br>
 - Users can select and lock seats during booking to avoid overbooking. <br>
-5. Payment Processing (Simulates payment processing) <br>
+4. Payment Processing (Simulates payment processing) <br>
 - The system initiates a payment request. <br>
 - Payment service verifies transaction (mock) and returns success/failure. <br>
 - On success, the seat is permanently locked and booking status is updated. <br>
-6. Event-Driven Notifications <br>
+5. Event-Driven Notifications <br>
 - Emit events such as BookingCreated, PaymentConfirmed, BookingCancelled via Kafka. <br>
 - Consumers act accordingly (e.g., Payment Service listens to booking events). <br>
-7. API Gateway <br>
+6. API Gateway <br>
 - Route external requests to proper services. <br>
 - Validate session id and forward headers to downstream services. <br>
 
