@@ -113,10 +113,10 @@ def get_all_events(db):
 
 
 def get_event_by_id(db, event_id):
-    return Event.query.get(event_id)
+    print("I go here", flush=True)
+    return db.session.query(Event).filter(Event.id == event_id).first()
 
 # Register the service in Consul
-
 
 def register_service_consul(port):
     consul = ConsulServiceRegistry(
@@ -139,6 +139,7 @@ def register_service_consul(port):
     return consul
 
 # Routes
+
 
 def create_routes(db):
     event_bp = Blueprint("event", __name__)
@@ -189,7 +190,6 @@ def main():
     # Initialize the event model
     global Event
     Event = create_event_model(db)
-    
 
     app.register_blueprint(create_routes(db))
 

@@ -26,16 +26,17 @@ def get_event_URL():
 
 
 @events_bp.route("/", methods=["GET"])
-def get_events():
+def handle_events():
+    event_id = request.args.get("event_id")
     EVENT_SERVICE_URL = get_event_URL()
-    res = requests.get(f"{EVENT_SERVICE_URL}/events")
-    return jsonify(res.json()), res.status_code
 
+    if event_id:
+        print("Fetching single event", flush=True)
+        res = requests.get(f"{EVENT_SERVICE_URL}/events/{event_id}")
+    else:
+        print("Fetching all events", flush=True)
+        res = requests.get(f"{EVENT_SERVICE_URL}/events")
 
-@events_bp.route("/<event_id>", methods=["GET"])
-def get_seats(event_id):
-    EVENT_SERVICE_URL = get_event_URL()
-    res = requests.get(f"{EVENT_SERVICE_URL}/events/{event_id}")
     try:
         return jsonify(res.json()), res.status_code
     except ValueError:
