@@ -3,7 +3,7 @@ from auth import auth_bp
 from events import events_bp
 from booking import booking_bp
 from payment import payment_bp
-
+import socket
 import sys
 import os
 
@@ -31,6 +31,8 @@ def main():
     consul = ConsulServiceRegistry()
     consul.wait_for_consul()
 
+    hostname = socket.gethostname()
+    ip_address = socket.gethostbyname(hostname)
     service_name = "api-gateway"
     service_id = "api-gateway-1"
     service_port = 8080
@@ -39,7 +41,8 @@ def main():
         consul.register_service(
             service_name=service_name,
             service_id=service_id,
-            port=service_port
+            port=service_port,
+            address=ip_address
         )
         print(f"[Consul] Registered {service_name}", flush=True)
     except Exception as e:

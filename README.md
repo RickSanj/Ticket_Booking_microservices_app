@@ -1,8 +1,8 @@
 # Ticket Booking System – Microservices Architecture
 
 ## Overview
-This project is a microservices-based ticket booking system, designed for scalability, maintainability, and fault tolerance. It allows users to register, log in, browse events, select seats, and make bookings with secure payments.
-<br>
+This project is a microservices-based ticket booking system, designed for scalability, maintainability, and fault tolerance. It allows users to register, log in, browse events, select seats, and make bookings with secure payments.<br>
+
 Built with Docker, Kafka, Redis, Cassandra, Postgres, Consul. The system consists of independent services that communicate through REST APIs and asynchronous messaging using Kafka.
 
 ## Requirements
@@ -66,7 +66,7 @@ postgres 5432<br>
     git clone <repository-url>
     cd <repository-folder>
 ```
-2. **Build project in docker**
+2. **Build project in Docker**
 ```bash
 docker-compose build --no-cache 
 ```
@@ -74,3 +74,9 @@ docker-compose build --no-cache
 ```bash
 docker compose up 
 ```
+
+docker compose down -v    
+docker-compose build --no-cache 
+docker compose up 
+
+ rm -rf ./pgdata

@@ -11,7 +11,7 @@ class ConsulServiceRegistry:
         self.service_name = None
         self.service_id = None
 
-    def register_service(self, service_name, service_id, port, tags=None, check_interval='10s'):
+    def register_service(self, service_name, service_id, port, address, tags=None, check_interval='10s'):
         """
         Registers a service with Consul.
 
@@ -24,11 +24,11 @@ class ConsulServiceRegistry:
         self.service_name = service_name
         self.service_id = service_id
         
-        hostname = socket.gethostname()
-        ip_address = socket.gethostbyname(hostname)
+        # hostname = socket.gethostname()
+        # ip_address = socket.gethostbyname(hostname)
 
         # Define the health check URL
-        health_check_url = f'http://{ip_address}:{port}/health'
+        health_check_url = f'http://{address}:{port}/health'
 
         # Register the service with a health check
         try:
@@ -36,6 +36,7 @@ class ConsulServiceRegistry:
                 service_name,
                 service_id=service_id,
                 port=port,
+                address=address,
                 tags=tags,
                 check={
                     'http': health_check_url,
