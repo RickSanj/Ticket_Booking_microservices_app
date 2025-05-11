@@ -36,4 +36,23 @@ def get_events():
 def get_seats(event_id):
     EVENT_SERVICE_URL = get_event_URL()
     res = requests.get(f"{EVENT_SERVICE_URL}/events/{event_id}")
-    return jsonify(res.json()), res.status_code
+    try:
+        return jsonify(res.json()), res.status_code
+    except ValueError:
+        return jsonify({"error": "Invalid response from event-service"}), 500
+
+
+@events_bp.route("/", methods=["POST"])
+def create_event():
+    EVENT_SERVICE_URL = get_event_URL()
+    data = request.get_json()
+
+    if not data or "title" not in data or "date_time" not in data or "venue" not in data or "performer" not in data:
+        return jsonify({"error": "Missing 'title', 'date_time', 'venue', or 'performer'"}), 400
+
+    res = requests.post(f"{EVENT_SERVICE_URL}/events", json=data)
+
+    try:
+        return jsonify(res.json()), res.status_code
+    except ValueError:
+        return jsonify({"error": "Invalid response from event-service"}), 500
