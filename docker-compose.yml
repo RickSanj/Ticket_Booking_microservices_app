@@ -37,86 +37,6 @@ services:
         networks:
             - project-network
 
-<<<<<<< HEAD
-    redis:
-      image: redis:latest
-      container_name: redis_autorization
-      environment:
-        - REDIS_PASSWORD=${REDIS_PASSWORD}
-        - REDIS_USER=${REDIS_USER}
-        - REDIS_USER_PASSWORD=${REDIS_USER_PASSWORD}
-      ports:
-        - "6380:6379"
-      volumes:
-        - ./redisdata:/data
-      deploy:
-        resources:
-          limits:
-            cpus: '0.50'
-            memory: 512M
-          reservations:
-            cpus: '0.25'
-            memory: 256M
-      command: >
-        sh -c '
-          mkdir -p /usr/local/etc/redis &&
-          echo "bind 0.0.0.0" > /usr/local/etc/redis/redis.conf &&
-          echo "requirepass $REDIS_PASSWORD" >> /usr/local/etc/redis/redis.conf &&
-          echo "appendonly yes" >> /usr/local/etc/redis/redis.conf &&
-          echo "appendfsync everysec" >> /usr/local/etc/redis/redis.conf &&
-          echo "user default on nopass ~* +@all" > /usr/local/etc/redis/users.acl &&
-          echo "user $REDIS_USER on >$REDIS_USER_PASSWORD ~* +@all" >> /usr/local/etc/redis/users.acl &&
-          redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
-        '
-      healthcheck:
-        test: ["CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping"]
-        interval: 30s
-        timeout: 10s
-        retries: 5
-      restart: unless-stopped
-      tty: true
-      stdin_open: true
-
-    postgres-auth:
-      image: postgres:latest
-      container_name: postgres_authorization
-      environment:
-        POSTGRES_USER: admin
-        POSTGRES_PASSWORD: pass
-        POSTGRES_DB: postgres_db
-        PGDATA: /var/lib/postgresql/data/pgdata
-      ports:
-        - "5430:5432"
-      volumes:
-        - ./pgdata:/var/lib/postgresql/data/pgdata
-      deploy:
-        resources:
-          limits:
-            cpus: '0.50'
-            memory: 512M
-          reservations:
-            cpus: '0.25'
-            memory: 256M
-      command: >
-        postgres -c max_connections=1000
-                -c shared_buffers=256MB
-                -c effective_cache_size=768MB
-                -c maintenance_work_mem=64MB
-                -c checkpoint_completion_target=0.7
-                -c wal_buffers=16MB
-                -c default_statistics_target=100
-      healthcheck:
-        test: [ "CMD-SHELL", "pg_isready -U admin -d postgres_db" ]
-        interval: 30s
-        timeout: 10s
-        retries: 5
-      restart: unless-stopped
-      tty: true
-      stdin_open: true
-      networks:
-        - project-network
-
-=======
     event-db:
         image: postgres:latest
         container_name: event-db
@@ -152,7 +72,6 @@ services:
         networks:
             - project-network
 
->>>>>>> 605129241376013dabb9a7b3cc36bb1f99f90ad7
 
 networks:
     project-network:
