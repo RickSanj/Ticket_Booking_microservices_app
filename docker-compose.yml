@@ -1,59 +1,43 @@
 services:
     api-gateway:
         build:
-            context: ./api-gateway
+            context: .
+            dockerfile: Dockerfile.api-gateway
         container_name: api-gateway
         ports:
             - "8080:8080"
         networks:
             - project-network
         depends_on:
-            consul
-        #   - redis
+            - consul
+            - event-service
         #   - kafka
 
     event-service:
         build:
-            context: ./event-service
+            context: .
+            dockerfile: Dockerfile.event-service
         container_name: event-service
         ports:
             - "8082:8082"
         environment:
-            - POSTGRES_HOST=postgres
-            - POSTGRES_PORT=5432
-            - POSTGRES_DB=event_db
-            - POSTGRES_USER=postgres
-            - POSTGRES_PASSWORD=postgres
+            DATABASE_URL: postgres://admin:pass@event-db:5432/event_db
         depends_on:
-            - postgres
+            - register-event-db
         networks:
             - project-network
 
-    postgres:
-        image: postgres:13
-        container_name: postgres
-        restart: always
-        ports:
-            - "5432:5432"
-        environment:
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-        volumes:
-            - pgdata:/var/lib/postgresql/data
-            - ./event-service/database/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-        networks:
-            - project-network
-    
     consul:
         image: consul:1.15
-        container_name: consul
+        container_name: consul-server
         ports:
-            - "8500:8500"  # HTTP UI/API
-            - "8600:8600/udp"  # DNS
+            - "8500:8500"
+            - "8600:8600/udp" # DNS
         command: "agent -dev -client=0.0.0.0"
         networks:
             - project-network
 
+<<<<<<< HEAD
     redis:
       image: redis:latest
       container_name: redis_autorization
@@ -132,6 +116,43 @@ services:
       networks:
         - project-network
 
+=======
+    event-db:
+        image: postgres:latest
+        container_name: event-db
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: pass
+            POSTGRES_DB: event_db
+            PGDATA: /var/lib/postgresql/data/pgdata
+        ports:
+            - "5432:5432"
+        depends_on:
+            - consul
+        volumes:
+            - ./pgdata:/var/lib/postgresql/data/pgdata
+            - ./event-service/database/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+        healthcheck:
+            test: ["CMD", "pg_isready", "-U", "admin", "-d", "event_db"]
+            interval: 10s
+            timeout: 10s
+            retries: 5
+        restart: unless-stopped
+        networks:
+            - project-network
+
+
+    register-event-db:
+        build:
+            context: .
+            dockerfile: Dockerfile.event_db  # Define this Dockerfile for the registration service
+        container_name: register-event-db
+        depends_on:
+            - event-db
+        networks:
+            - project-network
+
+>>>>>>> 605129241376013dabb9a7b3cc36bb1f99f90ad7
 
 networks:
     project-network:
