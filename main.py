@@ -76,8 +76,6 @@ def register_user(username, password):
 
     new_id = max((get_user_ids()), default=0) + 1
 
-    print(new_id)
-
     hashed_password = bcrypt.hash(password)
 
     cursor_connection.execute(set_user_request, (username, hashed_password, new_id))
