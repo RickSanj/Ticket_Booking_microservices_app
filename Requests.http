@@ -1,13 +1,17 @@
-###    API gateway HEALTH
+###    API gateway
 GET http://localhost:8080/health
 Accept: text/html
 
+###    API gateway
+GET http://localhost:8080/events
+Accept: text/html
 
-###    Event-service HEALTH
+
+###    Event-service
 GET http://localhost:8082/health
 Accept: text/html
 
-###    Event-service events
+### 
 GET http://localhost:8082/events
 Accept: text/html
 

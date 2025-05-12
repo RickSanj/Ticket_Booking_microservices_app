@@ -1,93 +1,77 @@
 services:
     api-gateway:
         build:
-            context: ./api-gateway
+            context: .
+            dockerfile: Dockerfile.api-gateway
         container_name: api-gateway
         ports:
             - "8080:8080"
         networks:
             - project-network
         depends_on:
-            consul
-        #   - redis
+            - consul
+            - event-service
         #   - kafka
 
     event-service:
         build:
-            context: ./event-service
+            context: .
+            dockerfile: Dockerfile.event-service
         container_name: event-service
         ports:
             - "8082:8082"
         environment:
-            - POSTGRES_HOST=postgres
-            - POSTGRES_PORT=5432
-            - POSTGRES_DB=event_db
-            - POSTGRES_USER=postgres
-            - POSTGRES_PASSWORD=postgres
+            DATABASE_URL: postgres://admin:pass@event-db:5432/event_db
         depends_on:
-            - postgres
+            - register-event-db
         networks:
             - project-network
 
-    postgres:
-        image: postgres:13
-        container_name: postgres
-        restart: always
-        ports:
-            - "5432:5432"
-        environment:
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-        volumes:
-            - pgdata:/var/lib/postgresql/data
-            - ./event-service/database/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-        networks:
-            - project-network
-    
     consul:
         image: consul:1.15
-        container_name: consul
+        container_name: consul-server
         ports:
-            - "8500:8500"  # HTTP UI/API
-            - "8600:8600/udp"  # DNS
+            - "8500:8500"
+            - "8600:8600/udp" # DNS
         command: "agent -dev -client=0.0.0.0"
         networks:
             - project-network
 
+    event-db:
+        image: postgres:latest
+        container_name: event-db
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: pass
+            POSTGRES_DB: event_db
+            PGDATA: /var/lib/postgresql/data/pgdata
+        ports:
+            - "5432:5432"
+        depends_on:
+            - consul
+        volumes:
+            - ./pgdata:/var/lib/postgresql/data/pgdata
+            - ./event-service/database/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+        healthcheck:
+            test: ["CMD", "pg_isready", "-U", "admin", "-d", "event_db"]
+            interval: 10s
+            timeout: 10s
+            retries: 5
+        restart: unless-stopped
+        networks:
+            - project-network
 
-    # redis:
-    #   image: redis:7
-    #   container_name: redis
-    #   networks:
-    #     - project-network
 
-    # kafka:
-    #       image: bitnami/kafka:latest
-    #       container_name: kafka
-    #       ports:
-    #           - "9092:9092"
-    #       environment:
-    #           - KAFKA_CFG_NODE_ID=1
-    #           - KAFKA_CFG_PROCESS_ROLES=broker,controller
-    #           - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-    #           - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://:9093
-    #           - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-    #           - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-    #           - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-    #           - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-    #           - KAFKA_BROKER_ID=1
-    #           - KAFKA_CFG_BROKER_RACK=1
-    #       healthcheck:
-    #           test:
-    #               [
-    #                   "CMD-SHELL",
-    #                   "kafka-topics.sh --bootstrap-server kafka:9092 --list || exit 1",
-    #               ]
-    #           interval: 10s
-    #           timeout: 5s
-    #           retries: 10
-    #       volumes:
-    #           - kafka_data:/bitnami/kafka
+    register-event-db:
+        build:
+            context: .
+            dockerfile: Dockerfile.event_db  # Define this Dockerfile for the registration service
+        container_name: register-event-db
+        depends_on:
+            - event-db
+        networks:
+            - project-network
+
 
 networks:
     project-network:

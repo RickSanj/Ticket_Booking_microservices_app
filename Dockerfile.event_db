@@ -1,0 +1,15 @@
+#Dockerfile.event_db
+FROM python:3.11-slim
+
+WORKDIR /usr/src/app
+
+COPY event-service/requirements.txt /usr/src/app/
+
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt  
+
+COPY event-service/database/register_event_db.py /usr/src/app/
+
+
+CMD ["python", "register_event_db.py"]
+
