@@ -17,7 +17,7 @@ POSTGRES_CONFIG = {
 }
 
 REDIS_CONFIG = {
-    "host": "redis_autorization",
+    "host": "redis-authorization",
     "port": 6379,
     "username": "user",
     "password": "pass"
