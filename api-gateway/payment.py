@@ -1,80 +1,134 @@
-from flask import Flask, jsonify
-from confluent_kafka import Consumer, KafkaException
-import threading
-import uuid
+from flask import Flask, Blueprint, request, render_template_string, abort
+import requests
 import random
-from datetime import datetime
-import json
-import time
+from custom_consul.consul_ import ConsulServiceRegistry
 
-app = Flask(__name__)
+payment_bp = Blueprint('payment', __name__)
 
-#Instad of this must be
-#db init
-payments = {}
+def get_payment_service_url():
+    consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
+    consul.wait_for_consul()
+    service_name = 'payment-service'
+    services = consul.discover_service(service_name)
+    if not services:
+        raise Exception("Payment service not found in Consul.")
+    node = random.choice(services)
+    return f"http://{node['address']}:{node['port']}"
 
-KAFKA_TOPIC = "payment_requests"
-KAFKA_CONF = {
-    'bootstrap.servers': 'localhost:9092',
-    'group.id': 'payment_service_group',
-    'auto.offset.reset': 'earliest'}
+@payment_bp.route("/")
+def home():
+    return render_template_string("""
+    <h2>Payment Lookup</h2>
+    <form action="/payments" method="get">
+        Payment ID: <input type="text" name="payment_id"><br>
+        <input type="submit" value="Get Payment">
+    </form>
+    """)
 
-@app.route('/health')
-def health():
-    return "OK", 200
+@payment_bp.route("/payments", methods=["GET"])
+def fetch_payment():
+    payment_id = request.args.get("payment_id")
+    if not payment_id:
+        abort(400, "Payment ID is required.")
 
-def handle_payment(data):
-    """Simulates payment processing and stores it."""
-    payment_id = str(uuid.uuid4())
-    payment = {
-        'id': payment_id,
-        'amount': data.get('amount'),
-        'currency': data.get('currency'),
-        'status': random.choice(['completed']),
-        'created_at': datetime.utcnow().isoformat()
+    backend_url = get_payment_service_url()
+    res = requests.get(f"{backend_url}/payments/{payment_id}")
+
+    if res.status_code == 404:
+        return f"<p>Payment not found</p>", 404
+    elif res.status_code != 200:
+        abort(res.status_code, res.text)
+
+    payment = res.json()
+    return render_template_string(f"""
+    <h2>Payment Info</h2>
+    <ul>
+        <li>ID: {payment['id']}</li>
+        <li>Amount: {payment['amount']}</li>
+        <li>Currency: {payment['currency']}</li>
+        <li>Status: {payment['status']}</li>
+        <li>Created At: {payment['created_at']}</li>
+    </ul>
+    <a href="/">Search another</a>
+    """)
+
+
+from flask import Flask, Blueprint, request, render_template_string, abort
+import requests
+import random
+from custom_consul.consul_ import ConsulServiceRegistry
+
+payment_bp = Blueprint('payment', __name__)
+
+def get_payment_service_url():
+    consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
+    consul.wait_for_consul()
+    service_name = 'payment-service'
+    services = consul.discover_service(service_name)
+    if not services:
+        raise Exception("Payment service not found in Consul.")
+    node = random.choice(services)
+    return f"http://{node['address']}:{node['port']}"
+
+@payment_bp.route("/")
+def home():
+    return render_template_string("""
+    <h2>Payment Lookup</h2>
+    <form action="/payments" method="get">
+        Payment ID: <input type="text" name="payment_id"><br>
+        <input type="submit" value="Get Payment">
+    </form>
+    <h2>Create a New Payment</h2>
+    <form action="/payments" method="post">
+        Amount: <input type="text" name="amount" required><br>
+        Currency: <input type="text" name="currency" required><br>
+        <input type="submit" value="Create Payment">
+    </form>
+    """)
+
+@payment_bp.route("/payments", methods=["GET"])
+def fetch_payment():
+    payment_id = request.args.get("payment_id")
+    if not payment_id:
+        abort(400, "Payment ID is required.")
+
+    backend_url = get_payment_service_url()
+    res = requests.get(f"{backend_url}/payments/{payment_id}")
+
+    if res.status_code == 404:
+        return f"<p>Payment not found</p>", 404
+    elif res.status_code != 200:
+        abort(res.status_code, res.text)
+
+    payment = res.json()
+    return render_template_string(f"""
+    <h2>Payment Info</h2>
+    <ul>
+        <li>ID: {payment['id']}</li>
+        <li>Amount: {payment['amount']}</li>
+        <li>Currency: {payment['currency']}</li>
+        <li>Status: {payment['status']}</li>
+        <li>Created At: {payment['created_at']}</li>
+    </ul>
+    <a href="/">Search another</a>
+    """)
+
+@payment_bp.route("/payments", methods=["POST"])
+def create_payment():
+    amount = request.form.get("amount")
+    currency = request.form.get("currency")
+
+    if not amount or not currency:
+        abort(400, "Amount and currency are required.")
+
+    backend_url = get_payment_service_url()
+    payment_data = {
+        "amount": amount,
+        "currency": currency
     }
-    ### Add to db
-    payments[payment_id] = payment
+    res = requests.post(f"{backend_url}/payments", json=payment_data)
 
-    print(f"[Kafka] Processed payment: {payment_id}")
-
-def kafka_consumer():
-    """Background thread consuming Kafka messages."""
-    consumer = Consumer(KAFKA_CONF)
-    consumer.subscribe([KAFKA_TOPIC])
-
-    try:
-        while True:
-            msg = consumer.poll(1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                print(f"[Kafka Error] {msg.error()}")
-                continue
-            try:
-                data = json.loads(msg.value().decode('utf-8'))
-                if 'amount' in data and 'currency' in data:
-                    handle_payment(data)
-                else:
-                    print("[Kafka] Invalid payment data.")
-            except json.JSONDecodeError:
-                print("[Kafka] Failed to decode JSON.")
-    except KeyboardInterrupt:
-        pass
-    finally:
-        consumer.close()
-
-@app.route('/payments/<payment_id>', methods=['GET'])
-def get_payment(payment_id):
-    payment = payments.get(payment_id)
-    if not payment:
-        return jsonify({'error': 'Payment not found'}), 404
-    return jsonify(payment)
-
-@app.route('/')
-def index():
-    return "Kafka-backed Payment Service is running."
-
-if __name__ == '__main__':
-    threading.Thread(target=kafka_consumer, daemon=True).start()
-    app.run(debug=True)
+    if res.status_code == 201:
+        return "<p>Payment created successfully!</p>"
+    else:
+        abort(res.status_code, res.text)

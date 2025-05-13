@@ -4,9 +4,9 @@ from flask_sqlalchemy import SQLAlchemy
 import argparse
 from datetime import datetime
 from custom_consul.consul_ import ConsulServiceRegistry
+import socket
 import psycopg2
 import time
-import socket
 
 
 def wait_for_postgres(host, port, user, password, db, retries=10, delay=3):

@@ -5,7 +5,6 @@ from custom_consul.consul_ import ConsulServiceRegistry
 
 events_bp = Blueprint('events', __name__)
 
-
 def get_event_URL():
     consul = ConsulServiceRegistry(
         consul_host='consul-server', consul_port=8500)
