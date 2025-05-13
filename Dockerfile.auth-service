@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /usr/src/app
+
+COPY auth-service/requirements.txt /usr/src/app/
+
+RUN pip install -r requirements.txt
+
+COPY auth-service /usr/src/app
+COPY custom_consul /usr/src/app/custom_consul
+
+ENV PYTHONPATH=/usr/src/app
+
+EXPOSE 8000:6000
+
+CMD ["python", "main.py"]
