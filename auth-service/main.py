@@ -1,192 +1,131 @@
-from flask import Flask, request, redirect, make_response, render_template_string, abort
+from flask import Flask, request, jsonify, abort
 from passlib.hash import bcrypt
 import uuid
 import psycopg2
 import redis
+import socket
+from custom_consul.consul_ import ConsulServiceRegistry
 
 app = Flask(__name__)
 
-POSTGRES_DB_NAME = "authorization"
-POSTGRES_USER = "admin"
-POSTGRES_PASSWORD = "pass"
-POSTGRES_HOST = "postgres-authorization"
-POSTGRES_PORT = 5432
+POSTGRES_CONFIG = {
+    "database": "authorization",
+    "user": "admin",
+    "password": "pass",
+    "host": "postgres-authorization",
+    "port": 5432
+}
 
-REDIS_USERNAME = "user"
-REDIS_PASSWORD = "pass"
-REDIS_HOST = "redis_autorization"
-REDIS_PORT = 6379
+REDIS_CONFIG = {
+    "host": "redis_autorization",
+    "port": 6379,
+    "username": "user",
+    "password": "pass"
+}
 
-# Postgres init
-postgres_connection = psycopg2.connect(database=POSTGRES_DB_NAME, user=POSTGRES_USER, password=POSTGRES_PASSWORD, host=POSTGRES_HOST, port=POSTGRES_PORT)
-cursor_connection = postgres_connection.cursor()
+postgres_conn = psycopg2.connect(**POSTGRES_CONFIG)
+postgres_cursor = postgres_conn.cursor()
+redis_client = redis.Redis(**REDIS_CONFIG, decode_responses=True)
 
-# Redis init
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, username=REDIS_USERNAME, password=REDIS_PASSWORD)
-
-# Postgres Code
 def get_user_password(username):
-    password_request ="""
-    select
-        password
-    from
-        logging_password
-    where
-        login = %s
-    """
-
-    cursor_connection.execute(password_request, (username, ))
-
-    record = cursor_connection.fetchone()
-
-    return record[0]
+    postgres_cursor.execute("SELECT password FROM logging_password WHERE login = %s", (username,))
+    record = postgres_cursor.fetchone()
+    return record[0] if record else None
 
 def get_user_id(username):
-    user_id_request ="""
-    select
-        user_id
-    from
-        logging_password
-    where
-        login = %s
-    """
-
-    cursor_connection.execute(user_id_request, (username, ))
-
-    record = cursor_connection.fetchone()
-
-    return record[0]
+    postgres_cursor.execute("SELECT user_id FROM logging_password WHERE login = %s", (username,))
+    record = postgres_cursor.fetchone()
+    return record[0] if record else None
 
 def get_user_ids():
-    user_id_request ="""
-    select
-        user_id
-    from
-        logging_password
-    """
-
-    cursor_connection.execute(user_id_request)
-
-    record = cursor_connection.fetchall()
-
-    return [value[0] for value in record] if record else []
+    postgres_cursor.execute("SELECT user_id FROM logging_password")
+    return [row[0] for row in postgres_cursor.fetchall()]
 
 def register_user(username, password):
-    set_user_request = """INSERT INTO logging_password VALUES (%s, %s, %s);"""
+    new_id = max(get_user_ids(), default=0) + 1
+    hashed_pw = bcrypt.hash(password)
+    postgres_cursor.execute("INSERT INTO logging_password VALUES (%s, %s, %s)", (username, hashed_pw, new_id))
+    postgres_conn.commit()
 
-    new_id = max((get_user_ids()), default=0) + 1
+def user_exists(username):
+    postgres_cursor.execute("SELECT login FROM logging_password WHERE login = %s", (username,))
+    return postgres_cursor.fetchone() is not None
 
-    hashed_password = bcrypt.hash(password)
-
-    cursor_connection.execute(set_user_request, (username, hashed_password, new_id))
-
-    postgres_connection.commit()
-
-def check_user_existance(login):
-    password_request ="""
-    select
-        login
-    from
-        logging_password
-    where
-        login = %s
-    """
-
-    cursor_connection.execute(password_request, (login, ))
-
-    record = cursor_connection.fetchone()
-
-    return record is not None
-
-
-# Redis code
-def create_userid_session(user_id: int) -> str:
+def create_session(user_id):
     session_id = str(uuid.uuid4())
-
     redis_client.set(session_id, user_id)
-
     return session_id
 
-def get_userid_by_session(session_id: str):
-    if not redis_client.exists(session_id):
-        return None
+def get_userid_by_session(session_id):
+    return redis_client.get(session_id) if redis_client.exists(session_id) else None
 
-    user_id = redis_client.get(session_id)
-
-    return user_id
-
-def delete_userid_session(session_id: str):
+def delete_session(session_id):
     redis_client.delete(session_id)
 
 
-# App code
-@app.route("/register", methods=["GET"])
-def register_form():
-    return render_template_string("""
-    <form action="/register" method="post">
-      Email: <input type="email" name="email"><br>
-      Password: <input type="password" name="password"><br>
-      <input type="submit" value="Register">
-    </form>
-    """)
+@app.route("/health")
+def health():
+    return "OK", 200
+
 
 @app.route("/register", methods=["POST"])
 def register():
-    email = request.form.get("email")
-    password = request.form.get("password")
+    data = request.json
+    email = data.get("email")
+    password = data.get("password")
 
-    if check_user_existance(email):
-        abort(400, "Email already registered")
+    if not email or not password:
+        abort(400, "Email and password required")
+
+    if user_exists(email):
+        abort(409, "Email already registered")
 
     register_user(email, password)
-
-    return redirect("/login")
-
-@app.route("/login", methods=["GET"])
-def login_form():
-    return render_template_string("""
-    <form action="/login" method="post">
-      Email: <input type="email" name="email"><br>
-      Password: <input type="password" name="password"><br>
-      <input type="submit" value="Login">
-    </form>
-    """)
+    return jsonify({"message": "User registered"}), 201
 
 @app.route("/login", methods=["POST"])
 def login():
-    email = request.form.get("email")
-    password = request.form.get("password")
+    data = request.json
+    email = data.get("email")
+    password = data.get("password")
 
-    if not check_user_existance(email) or not bcrypt.verify(password, get_user_password(email)):
+    stored_pw = get_user_password(email)
+    if not stored_pw or not bcrypt.verify(password, stored_pw):
         abort(401, "Invalid credentials")
 
-    session_id = create_userid_session(get_user_id(email))
+    session_id = create_session(get_user_id(email))
+    return jsonify({"session_id": session_id}), 200
 
-    resp = make_response(redirect("/main"))
-    resp.set_cookie("session_id", session_id, httponly=True)
-    return resp
-
-@app.route("/main", methods=["GET"])
-def main():
-    session_id = request.cookies.get("session_id")
-    if not session_id:
-        abort(401, "No session")
-
+@app.route("/session/<session_id>", methods=["GET"])
+def session_info(session_id):
     user_id = get_userid_by_session(session_id)
     if not user_id:
         abort(401, "Invalid or expired session")
+    return jsonify({"user_id": user_id}), 200
 
-    return f"Welcome user #{user_id}!"
+@app.route("/session/<session_id>", methods=["DELETE"])
+def session_delete(session_id):
+    delete_session(session_id)
+    return jsonify({"message": "Session deleted"}), 200
 
-@app.route("/logout", methods=["GET"])
-def logout():
-    session_id = request.cookies.get("session_id")
-    if session_id:
-        delete_userid_session(session_id)
-
-    resp = make_response(redirect("/login"))
-    resp.delete_cookie("session_id")
-    return resp
+def register_service_consul(port):
+    consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
+    consul.wait_for_consul()
+    hostname = socket.gethostname()
+    ip_address = socket.gethostbyname(hostname)
+    try:
+        consul.register_service(
+            service_name="auth-service",
+            service_id=f"auth-service-{port}",
+            address=ip_address,
+            port=port
+        )
+        print(f"[Consul] Registered auth-service", flush=True)
+    except Exception as err:
+        print(f"[Consul Error] {err}", flush=True)
+    return consul
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    PORT = 6000
+    register_service_consul(PORT)
+    app.run(host="0.0.0.0", port=PORT, debug=True)
