@@ -11,6 +11,7 @@ services:
     depends_on:
       - consul
       - event-service
+      - auth-microservice
 
   event-service:
     build:
@@ -151,11 +152,11 @@ services:
     networks:
       - project-network
 
-  auth-gateway:
+  auth-microservice:
     build:
       context: .
       dockerfile: Dockerfile.auth-service
-    container_name: auth-gateway
+    container_name: auth-microservice
     ports:
       - "8000:8000"
     networks:

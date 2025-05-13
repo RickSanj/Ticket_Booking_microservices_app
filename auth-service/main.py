@@ -27,6 +27,7 @@ postgres_conn = psycopg2.connect(**POSTGRES_CONFIG)
 postgres_cursor = postgres_conn.cursor()
 redis_client = redis.Redis(**REDIS_CONFIG, decode_responses=True)
 
+
 def get_user_password(username):
     postgres_cursor.execute("SELECT password FROM logging_password WHERE login = %s", (username,))
     record = postgres_cursor.fetchone()

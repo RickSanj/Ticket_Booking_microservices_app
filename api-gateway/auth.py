@@ -1,11 +1,11 @@
-from flask import Blueprint, request, redirect, render_template_string, make_response, abort
+from flask import Blueprint, request, redirect, render_template_string, make_response, abort, url_for
+
 import requests
 import random
 from custom_consul.consul_ import ConsulServiceRegistry
 
 
 auth_bp = Blueprint('auth', __name__)
-
 
 def get_event_URL():
     consul = ConsulServiceRegistry(
@@ -46,7 +46,8 @@ def register():
     if res.status_code != 201:
         abort(res.status_code, res.text)
 
-    return redirect("/auth/login")
+    return redirect(url_for('/auth/login'))
+
 
 @auth_bp.route("/login", methods=["GET"])
 def login_form():
