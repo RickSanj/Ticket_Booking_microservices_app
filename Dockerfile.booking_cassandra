@@ -1,0 +1,14 @@
+#Dockerfile.booking_cassandra
+FROM python:3.11-slim
+
+WORKDIR /usr/src/app
+
+COPY booking-service/requirements.txt /usr/src/app/
+
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt  
+
+COPY booking-service/database/register_cassandra.py /usr/src/app/
+
+
+CMD ["python", "register_cassandra.py"]
