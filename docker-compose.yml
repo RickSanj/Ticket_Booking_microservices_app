@@ -1,4 +1,5 @@
 services:
+#----------api-gateway---------
   api-gateway:
     build:
       context: .
@@ -11,8 +12,8 @@ services:
     depends_on:
       - consul
       - event-service
-      - auth-microservice
 
+#----------event-service---------
   event-service:
     build:
       context: .
@@ -26,7 +27,7 @@ services:
       - register-event-db
     networks:
       - project-network
-
+#----------consul---------
   consul:
     image: consul:1.15
     container_name: consul-server
@@ -37,6 +38,7 @@ services:
     networks:
       - project-network
 
+#----------event-db---------
   event-db:
     image: postgres:latest
     container_name: event-db
@@ -61,6 +63,7 @@ services:
     networks:
       - project-network
 
+#----------register-event-db---------
   register-event-db:
     build:
       context: .
@@ -71,6 +74,19 @@ services:
     networks:
       - project-network
 
+#----------register-auth-db---------
+  register-auth-db:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth_db
+    container_name: register-auth-db
+    depends_on:
+      - postgres-authorization
+      - consul
+    networks:
+      - project-network
+
+#----------redis-authorization---------
   redis-authorization:
     image: redis:latest
     container_name: redis-authorization
@@ -112,13 +128,14 @@ services:
     networks:
       - project-network
 
+#----------postgres-authorization---------
   postgres-authorization:
     image: postgres:latest
     container_name: postgres-authorization
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: pass
-      POSTGRES_DB: postgres_db
+      POSTGRES_DB: authorization
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5430:5432"
@@ -152,11 +169,12 @@ services:
     networks:
       - project-network
 
-  auth-microservice:
+#----------auth-gateway---------
+  auth-gateway:
     build:
       context: .
       dockerfile: Dockerfile.auth-service
-    container_name: auth-microservice
+    container_name: auth-gateway
     ports:
       - "8000:8000"
     networks:

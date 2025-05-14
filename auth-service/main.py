@@ -5,15 +5,56 @@ import psycopg2
 import redis
 import socket
 from custom_consul.consul_ import ConsulServiceRegistry
+import time
 
 app = Flask(__name__)
+
+def wait_for_postgres(host, port, user, password, db, retries=10, delay=3):
+    for i in range(retries):
+        try:
+            print(
+                f"Attempt {i+1}: Connecting to PostgreSQL at {host}:{port}...", flush=True)
+            conn = psycopg2.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                dbname=db
+            )
+            conn.close()
+            print("✅ PostgreSQL is ready!", flush=True)
+            return
+        except psycopg2.OperationalError as e:
+            print(f"PostgreSQL not ready yet: {e}", flush=True)
+            time.sleep(delay)
+    raise Exception("❌ PostgreSQL is still not ready after retries.")
+
+
+consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
+consul.wait_for_consul()
+discovered_services = consul.discover_service('postgres-authorization')
+print(discovered_services, flush=True)
+
+if discovered_services:
+    POSTGRES_HOST = discovered_services[0]['address']
+    POSTGRES_PORT = discovered_services[0]['port']
+else:
+    raise Exception("postgres-authorization service not found in Consul")
+
+wait_for_postgres(
+    host=POSTGRES_HOST,
+    port=POSTGRES_PORT,
+    user="admin",
+    password="pass",
+    db="authorization"
+)
 
 POSTGRES_CONFIG = {
     "database": "authorization",
     "user": "admin",
     "password": "pass",
-    "host": "postgres-authorization",
-    "port": 5432
+    "host": POSTGRES_HOST,
+    "port": POSTGRES_PORT
 }
 
 REDIS_CONFIG = {

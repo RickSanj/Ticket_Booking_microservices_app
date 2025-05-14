@@ -1,3 +1,5 @@
-pgdata/
+pgdata-auth/
+pgdata-event/
+redisdata/
 *.ipynb
 *.csv
