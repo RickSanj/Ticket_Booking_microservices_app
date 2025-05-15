@@ -20,3 +20,11 @@ CREATE TABLE IF NOT EXISTS bookings (
     PRIMARY KEY (event_id, ticket_id)
 );
 
+INSERT INTO tickets (event_id, ticket_id, seat_number, price)
+VALUES (1, 101, 'A1', 100.00);
+
+INSERT INTO tickets (event_id, ticket_id, seat_number, price)
+VALUES (1, 102, 'A2', 100.00);
+
+INSERT INTO tickets (event_id, ticket_id, seat_number, price)
+VALUES (1, 103, 'A3', 120.00);

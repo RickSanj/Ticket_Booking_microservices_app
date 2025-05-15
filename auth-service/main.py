@@ -30,20 +30,20 @@ def wait_for_postgres(host, port, user, password, db, retries=10, delay=3):
     raise Exception("❌ PostgreSQL is still not ready after retries.")
 
 
-consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
-consul.wait_for_consul()
-discovered_services = consul.discover_service('postgres-authorization')
-print(discovered_services, flush=True)
+# consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
+# consul.wait_for_consul()
+# discovered_services = consul.discover_service('postgres-authorization')
+# print(discovered_services, flush=True)
 
-if discovered_services:
-    POSTGRES_HOST = discovered_services[0]['address']
-    POSTGRES_PORT = discovered_services[0]['port']
-else:
-    raise Exception("postgres-authorization service not found in Consul")
+# if discovered_services:
+#     POSTGRES_HOST = discovered_services[0]['address']
+#     POSTGRES_PORT = discovered_services[0]['port']
+# else:
+#     raise Exception("postgres-authorization service not found in Consul")
 
 wait_for_postgres(
-    host=POSTGRES_HOST,
-    port=POSTGRES_PORT,
+    host="postgres-authorization",
+    port=5432,
     user="admin",
     password="pass",
     db="authorization"
@@ -53,8 +53,8 @@ POSTGRES_CONFIG = {
     "database": "authorization",
     "user": "admin",
     "password": "pass",
-    "host": POSTGRES_HOST,
-    "port": POSTGRES_PORT
+    "host": "postgres-authorization",
+    "port": 5432
 }
 
 REDIS_CONFIG = {

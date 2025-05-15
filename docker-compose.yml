@@ -24,7 +24,8 @@ services:
         environment:
             DATABASE_URL: postgres://admin:pass@register-event-db:5432/event_db
         depends_on:
-            - register-event-db
+            - event-db
+            - consul
         networks:
             - project-network
 
@@ -39,8 +40,8 @@ services:
             PGDATA: /var/lib/postgresql/data/pgdata
         ports:
             - "5432:5432"
-        depends_on:
-            - consul
+        # depends_on:
+        #     - consul
         volumes:
             - ./pgdata-event:/var/lib/postgresql/data/pgdata
             - ./event-service/database/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -52,31 +53,6 @@ services:
         restart: unless-stopped
         networks:
             - project-network
-
-    #----------register-event-db---------
-    register-event-db:
-        build:
-            context: .
-            dockerfile: Dockerfile.event_db
-        container_name: register-event-db
-        depends_on:
-            - event-db
-        networks:
-            - project-network
-        restart: "no"
-
-    #----------register-auth-db---------
-    register-auth-db:
-        build:
-            context: .
-            dockerfile: Dockerfile.auth_db
-        container_name: register-auth-db
-        depends_on:
-            - postgres-authorization
-            - consul
-        networks:
-            - project-network
-        restart: "no"
 
     #----------redis-authorization---------
     redis-authorization:
@@ -185,10 +161,38 @@ services:
         ports:
             - "8084:8084"
         depends_on:
-            - register-cassandra
+            - cassandra-init
         networks:
             - project-network
         command: python3 main.py --port 8084
+        restart: unless-stopped
+
+    booking-service2:
+        build:
+            context: .
+            dockerfile: Dockerfile.booking-service
+        container_name: booking-service2
+        ports:
+            - "8085:8085"
+        depends_on:
+            - cassandra-init
+        networks:
+            - project-network
+        command: python3 main.py --port 8085
+        restart: unless-stopped
+
+    booking-service3:
+        build:
+            context: .
+            dockerfile: Dockerfile.booking-service
+        container_name: booking-service3
+        ports:
+            - "8086:8086"
+        depends_on:
+            - cassandra-init
+        networks:
+            - project-network
+        command: python3 main.py --port 8086
         restart: unless-stopped
 
     #----------cassandra---------
@@ -204,24 +208,36 @@ services:
             - CASSANDRA_DC=datacenter1
             - CASSANDRA_RACK=rack1
         volumes:
-            - cassandra_data:/var/lib/cassandra
-            - ./booking-service/database/create_tables.cql:/docker-entrypoint-initdb.d/create_tables.cql
-    
-    #----------register-cassandra---------
+            - ./cassandra_data:/var/lib/cassandra
+        healthcheck:
+            test: ["CMD", "cqlsh", "-e", "DESCRIBE KEYSPACES"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
 
-    register-cassandra:
-        build:
-            context: .
-            dockerfile: Dockerfile.booking_cassandra
-        container_name: register-cassandra
+    #----------cassandra-init---------
+    cassandra-init:
+        image: cassandra:4.1
+        container_name: cassandra-init
         depends_on:
-            - cassandra
-            - consul
+            cassandra:
+                condition: service_healthy
+        entrypoint: ["/bin/bash", "-c"]
+        command: >
+            "
+            echo 'Waiting for Cassandra to be ready...';
+            until cqlsh cassandra 9042 -e 'SELECT now() FROM system.local'; do sleep 5; done;
+            echo 'Running init CQL...';
+            cqlsh cassandra 9042 -f /scripts/create_tables.cql;
+            echo 'Init done!';
+            "
+        volumes:
+            - ./booking-service/database/create_tables.cql:/scripts/create_tables.cql
         networks:
             - project-network
-        restart: "no"
-   
-     #----------redis-ticket-lock---------
+
+    #----------redis-ticket-lock---------
     redis-ticket-lock:
         image: redis:latest
         container_name: redis-ticket-lock
@@ -263,6 +279,7 @@ services:
         networks:
             - project-network
 
+    # todo create 2 payment services
     #----------consul---------
     consul:
         image: consul:1.15

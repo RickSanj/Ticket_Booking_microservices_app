@@ -7,7 +7,24 @@ from custom_consul.consul_ import ConsulServiceRegistry
 import socket
 import psycopg2
 import time
+import requests
+import random
 
+def get_booking_URL():
+    consul = ConsulServiceRegistry(
+        consul_host='consul-server', consul_port=8500)
+    consul.wait_for_consul()
+
+    service_name = 'booking-service'
+    discovered_services = consul.discover_service(service_name)
+    print(discovered_services, flush=True)
+
+    if discovered_services:
+        node = random.choice(discovered_services)
+        address = node['address']
+        port = node['port']
+        return f"http://{address}:{port}"
+    raise Exception(f"{service_name} service not found in Consul")
 
 def wait_for_postgres(host, port, user, password, db, retries=10, delay=3):
     for i in range(retries):
@@ -29,22 +46,16 @@ def wait_for_postgres(host, port, user, password, db, retries=10, delay=3):
             time.sleep(delay)
     raise Exception("❌ PostgreSQL is still not ready after retries.")
 
-# Initialize the Flask app and SQLAlchemy
-
 
 def create_app():
     app = Flask(__name__)
     CORS(app)
     return app
 
-# Initialize the db object
-
 
 def init_db(app):
     db = SQLAlchemy(app)
     return db
-
-# Define the Event model
 
 
 def create_event_model(db):
@@ -67,24 +78,16 @@ def create_event_model(db):
             }
     return Event
 
-# Utility function to get DB URL from Consul
 
-
-def get_db_URL(consul):
+def get_db_URL():
     POSTGRES_DB_NAME = "event_db"
     POSTGRES_USER = "admin"
     POSTGRES_PASSWORD = "pass"
-
-    discovered_services = consul.discover_service('event-db')
-    print(discovered_services, flush=True)
-    if discovered_services:
-        POSTGRES_HOST = discovered_services[0]['address']
-        POSTGRES_PORT = discovered_services[0]['port']
-    else:
-        raise Exception("event-db service not found in Consul")
+    POSTGRES_HOST = "event-db"
+    POSTGRES_PORT = 5432
 
     wait_for_postgres(
-        host=POSTGRES_HOST,
+        host="event-db",
         port=POSTGRES_PORT,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
@@ -95,7 +98,6 @@ def get_db_URL(consul):
 
 # Event service functions
 
-
 def create_event(db, data):
     event = Event(
         title=data["title"],
@@ -105,8 +107,49 @@ def create_event(db, data):
     )
     db.session.add(event)
     db.session.commit()
+
+    # After creating event, call booking service to create seats
+    event_id = event.id
+    num_seats = data.get("num_seats", 10)
+
+    try:
+        response = requests.post(
+            f"{get_booking_URL()}/create_seats",
+            json={"event_id": event_id, "num_seats": num_seats},
+            timeout=5
+        )
+        if response.status_code != 200:
+            db.session.delete(event)
+            db.session.commit()
+            return jsonify({"error": "Failed to create seats, rolled back event"}), 500
+    except Exception as e:
+        db.session.delete(event)
+        db.session.commit()
+        print(f"[Booking Service] Could not reach service: {e}")
+
     return event
 
+
+def delete_event(db, event_id):
+    event = db.session.get(Event, event_id)
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+
+    try:
+        response = requests.delete(
+            f"{get_booking_URL()}/delete_seats/{event_id}",
+            timeout=5
+        )
+
+        if response.status_code != 200:
+            return jsonify({"error": f"Failed to delete seats: {response.text}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Could not reach Booking Service: {str(e)}"}), 500
+
+    # If seat deletion succeeded, delete the event
+    db.session.delete(event)
+    db.session.commit()
+    return jsonify({"message": f"Event {event_id} and its seats deleted successfully"}), 200
 
 def get_all_events(db):
     return Event.query.all()
@@ -116,7 +159,6 @@ def get_event_by_id(db, event_id):
     print("I go here", flush=True)
     return db.session.query(Event).filter(Event.id == event_id).first()
 
-# Register the service in Consul
 
 def register_service_consul(port):
     consul = ConsulServiceRegistry(
@@ -166,6 +208,11 @@ def create_routes(db):
     def health():
         return "OK", 200
 
+    @event_bp.route("/events/<int:event_id>", methods=["DELETE"])
+    def delete_event_by_id(event_id):
+        return delete_event(db, event_id)
+
+
     return event_bp
 
 
@@ -182,18 +229,15 @@ def main():
 
     consul = register_service_consul(port)
 
-    # Initialize the database connection
-    app.config["SQLALCHEMY_DATABASE_URI"] = get_db_URL(consul)
+    app.config["SQLALCHEMY_DATABASE_URI"] = get_db_URL()
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db = init_db(app)
 
-    # Initialize the event model
     global Event
     Event = create_event_model(db)
 
     app.register_blueprint(create_routes(db))
 
-    # Initialize the database and create all tables
     with app.app_context():
         db.create_all()
 

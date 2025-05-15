@@ -1,11 +1,9 @@
+import socket
 from flask import Flask
 from auth import auth_bp
 from events import events_bp
 from booking import booking_bp
 from payment import payment_bp
-import socket
-import sys
-import os
 
 from custom_consul.consul_ import ConsulServiceRegistry
 
@@ -23,6 +21,10 @@ app.register_blueprint(payment_bp, url_prefix="/payment")
 def health():
     return "OK", 200
 
+
+@app.route("/")
+def home():
+    return "Welcome to Ticket Booking Service"
 
 # -------------------- Entry Point --------------------
 
@@ -45,8 +47,8 @@ def main():
             address=ip_address
         )
         print(f"[Consul] Registered {service_name}", flush=True)
-    except Exception as e:
-        print(f"[Consul Error] Failed to register: {e}", flush=True)
+    except Exception as err:
+        print(f"[Consul Error] Failed to register: {err}", flush=True)
 
     app.run(host="0.0.0.0", port=service_port)
 
