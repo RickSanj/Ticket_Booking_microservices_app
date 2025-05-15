@@ -10,7 +10,7 @@ import redis
 import random
 
 KEYSPACE = "bookings_db"
-
+#todo make sure user can only book tickets if is logged in
 
 class CassandraClient:
     def __init__(self, host, port, keyspace):
@@ -224,7 +224,7 @@ def book_seat():
     return jsonify({"message": "Seat locked. Proceed to payment", "ticket_id": ticket_id})
 
 
-# TODO use this function when user successfully paid. Should be called when consumer(booking) received message from payment service  (deletes temporary lock from redis and writes permanent booking betails to cassandra)
+# TODO use this function when user successfully paid. Should be called when consumer(booking) received message from MQ send by payment service  (deletes temporary lock from redis and writes permanent booking betails to cassandra)
 @app.route("/confirm", methods=["POST"])
 def confirm_booking():
     data = request.json
