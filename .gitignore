@@ -1,3 +1,7 @@
-pgdata/
+pgdata-auth/
+pgdata-event/
+redisdata/
+redisdata-booking/
+cassandra_data/
 *.ipynb
 *.csv

@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+WORKDIR /usr/src/app
+
+COPY booking-service/requirements.txt /usr/src/app/
+
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt  
+
+COPY booking-service /usr/src/app
+COPY custom_consul /usr/src/app/custom_consul
+
+ENV PYTHONPATH=/usr/src/app
+
+EXPOSE 8084 8085 8086
+
+CMD ["python", "main.py"]

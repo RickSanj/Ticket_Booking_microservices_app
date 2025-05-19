@@ -42,6 +42,7 @@ def handle_events():
         return jsonify({"error": "Invalid response from event-service"}), 500
 
 
+# todo only admin (no regular users) can do create_event() or delete_event
 @events_bp.route("/", methods=["POST"])
 def create_event():
     EVENT_SERVICE_URL = get_event_URL()
@@ -54,5 +55,18 @@ def create_event():
 
     try:
         return jsonify(res.json()), res.status_code
+    except ValueError:
+        return jsonify({"error": "Invalid response from event-service"}), 500
+
+
+@events_bp.route("/<int:event_id>", methods=["DELETE"])
+def delete_event(event_id):
+    EVENT_SERVICE_URL = get_event_URL()
+
+    try:
+        res = requests.delete(f"{EVENT_SERVICE_URL}/events/{event_id}")
+        return jsonify(res.json()), res.status_code
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Failed to reach event-service: {str(e)}"}), 500
     except ValueError:
         return jsonify({"error": "Invalid response from event-service"}), 500
