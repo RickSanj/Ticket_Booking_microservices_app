@@ -88,7 +88,7 @@ class CassandraClient:
         query = f"DELETE FROM {table_name} WHERE {where_clause};"
         self.session.execute(query, values)
 
-def get_event_URL(service_name):
+def get_service_url(service_name):
     consul = ConsulServiceRegistry(
         consul_host='consul-server', consul_port=8500
     )
@@ -111,7 +111,7 @@ def connect_to_cassandra():
     return client
 
 def get_user_id_from_session(session_id):
-    AUTH_SERVICE_URL = get_event_URL('auth-service')
+    AUTH_SERVICE_URL = get_service_url('auth-service')
     user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
     if user_id_response.status_code != 200:
         abort(user_id_response.status_code, user_id_response.text)
@@ -158,7 +158,6 @@ LOCK_TTL_SECONDS = 300  # 5 minutes
 @app.route("/health")
 def health():
     return "OK", 200
-
 
 @app.route("/available_seats/<event_id>", methods=["GET"])
 def get_available_seats(event_id):
