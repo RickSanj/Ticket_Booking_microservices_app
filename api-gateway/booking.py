@@ -6,12 +6,11 @@ from custom_consul.consul_ import ConsulServiceRegistry
 booking_bp = Blueprint('booking', __name__)
 
 
-def get_booking_URL():
+def get_service_url(service_name):
     consul = ConsulServiceRegistry(
         consul_host='consul-server', consul_port=8500)
     consul.wait_for_consul()
 
-    service_name = 'booking-service'
     discovered_services = consul.discover_service(service_name)
     print(discovered_services, flush=True)
 
@@ -27,7 +26,7 @@ def get_booking_URL():
 def create_booking():
     data = request.get_json()
     try:
-        booking_service_url = get_booking_URL()
+        booking_service_url = get_service_url('booking-service')
         res = requests.post(f"{booking_service_url}/", json=data)
         return jsonify(res.json()), res.status_code
     except Exception as e:
@@ -37,7 +36,7 @@ def create_booking():
 @booking_bp.route("/<user_id>", methods=["GET"])
 def get_user_bookings(user_id):
     try:
-        booking_service_url = get_booking_URL()
+        booking_service_url = get_service_url('booking-service')
         res = requests.get(f"{booking_service_url}/{user_id}")
         return jsonify(res.json()), res.status_code
     except Exception as e:
@@ -48,7 +47,7 @@ def get_user_bookings(user_id):
 def update_booking(booking_id):
     data = request.get_json()
     try:
-        booking_service_url = get_booking_URL()
+        booking_service_url = get_service_url('booking-service')
         res = requests.put(f"{booking_service_url}/{booking_id}", json=data)
         return jsonify(res.json()), res.status_code
     except Exception as e:
@@ -57,7 +56,7 @@ def update_booking(booking_id):
 
 @booking_bp.route("/available_seats/<event_id>", methods=["GET"])
 def get_available_seats(event_id):
-    booking_service_url = get_booking_URL()
+    booking_service_url = get_service_url('booking-service')
     res = requests.get(f"{booking_service_url}/available_seats/{event_id}")
     return jsonify(res.json()), res.status_code
 
@@ -68,7 +67,7 @@ def book_seat():
     if not session_id:
         abort(401, "No session")
     data = request.get_json()
-    booking_service_url = get_booking_URL()
+    booking_service_url = get_service_url('booking-service')
     res = requests.post(f"{booking_service_url}/book", json=data)
     return jsonify(res.json()), res.status_code
 
@@ -76,7 +75,7 @@ def book_seat():
 @booking_bp.route("/confirm", methods=["POST"])
 def confirm_booking():
     data = request.get_json()
-    booking_service_url = get_booking_URL()
+    booking_service_url = get_service_url('booking-service')
     res = requests.post(f"{booking_service_url}/confirm", json=data)
     return jsonify(res.json()), res.status_code
 
@@ -85,7 +84,7 @@ def confirm_booking():
 def create_seats():
     data = request.get_json()
     try:
-        booking_service_url = get_booking_URL()
+        booking_service_url = get_service_url('booking-service')
         res = requests.post(f"{booking_service_url}/create_seats", json=data)
         return jsonify(res.json()), res.status_code
     except Exception as e:
@@ -95,7 +94,7 @@ def create_seats():
 @booking_bp.route("/delete_seats/<event_id>", methods=["DELETE"])
 def delete_seats(event_id):
     try:
-        booking_service_url = get_booking_URL()
+        booking_service_url = get_service_url('booking-service')
         res = requests.delete(f"{booking_service_url}/delete_seats/{event_id}")
         return jsonify(res.json()), res.status_code
     except Exception as e:
