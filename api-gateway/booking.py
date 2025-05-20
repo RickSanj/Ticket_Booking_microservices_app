@@ -1,5 +1,5 @@
 import random
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, abort
 import requests
 from custom_consul.consul_ import ConsulServiceRegistry
 
@@ -64,6 +64,9 @@ def get_available_seats(event_id):
 
 @booking_bp.route("/book", methods=["POST"])
 def book_seat():
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        abort(401, "No session")
     data = request.get_json()
     booking_service_url = get_booking_URL()
     res = requests.post(f"{booking_service_url}/book", json=data)

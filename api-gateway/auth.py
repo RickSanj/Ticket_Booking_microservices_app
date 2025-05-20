@@ -101,6 +101,7 @@ def main():
         abort(401, "No session")
 
     AUTH_SERVICE_URL = get_event_URL()
+
     user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
 
     if user_id_response.status_code != 200:
