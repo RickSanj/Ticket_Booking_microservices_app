@@ -73,7 +73,7 @@ def login():
     if not session_id:
         abort(500, "Invalid response from auth service")
 
-    resp = make_response(redirect(url_for('auth.main')))
+    resp = make_response(redirect(url_for('events.show_events')))
     resp.set_cookie("session_id", session_id, httponly=True)
     return resp
 

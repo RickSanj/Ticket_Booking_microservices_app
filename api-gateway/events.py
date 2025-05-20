@@ -32,6 +32,9 @@ def get_user_id_from_session(session_id):
 
 @events_bp.route('/shows')
 def show_events():
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        abort(401, "No session")
 
     EVENT_SERVICE_URL = get_service_url("event-service")
 
