@@ -20,6 +20,24 @@ def get_payment_service_url():
     node = random.choice(services)
     return f"http://{node['address']}:{node['port']}"
 
+def produce_payment(amount, currency, user_id):
+    producer = Producer(KAFKA_CONF)
+
+    payment_data = {
+        "amount": amount,
+        "currency": currency,
+        "timestamp": datetime.now().strftime("%m-%d-%Y %H:%M:%S"),
+        "userID": user_id
+    }
+
+    producer.produce(
+        topic=KAFKA_TOPIC,
+        value=json.dumps(payment_data),
+        callback=delivery_report
+    )
+
+    producer.flush()
+
 @payment_bp.route("/")
 def home():
     return render_template_string("""
@@ -50,21 +68,3 @@ def delivery_report(err, msg):
         print(f"[Producer Error] Message delivery failed: {err}")
     else:
         print(f"[Producer] Message delivered to {msg.topic()} [{msg.partition()}]")
-
-def produce_payment(amount, currency, user_id):
-    producer = Producer(KAFKA_CONF)
-
-    payment_data = {
-        "amount": amount,
-        "currency": currency,
-        "timestamp": datetime.now().strftime("%m-%d-%Y %H:%M:%S"),
-        "userID": user_id
-    }
-
-    producer.produce(
-        topic=KAFKA_TOPIC,
-        value=json.dumps(payment_data),
-        callback=delivery_report
-    )
-
-    producer.flush()
