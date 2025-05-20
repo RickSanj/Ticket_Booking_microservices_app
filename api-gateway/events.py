@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, abort
+from flask import Blueprint, request, jsonify, abort, render_template
 import requests
 import random
 from custom_consul.consul_ import ConsulServiceRegistry
@@ -23,6 +23,23 @@ def get_service_url(service_name):
     return f"http://{address}:{port}"
 
 
+def get_user_id_from_session(session_id):
+    AUTH_SERVICE_URL = get_service_url('auth-service')
+    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
+    if user_id_response.status_code != 200:
+        abort(user_id_response.status_code, user_id_response.text)
+    return user_id_response.json().get("user_id")
+
+@events_bp.route('/shows')
+def show_events():
+
+    EVENT_SERVICE_URL = get_service_url("event-service")
+
+    resp = requests.get(f"{EVENT_SERVICE_URL}/events")
+    events_data = resp.json()
+
+    return render_template('events.html', events=events_data)
+
 @events_bp.route("/", methods=["GET"])
 def handle_events():
     event_id = request.args.get("event_id")
@@ -40,13 +57,6 @@ def handle_events():
     except ValueError:
         return jsonify({"error": "Invalid response from event-service"}), 500
 
-
-def get_user_id_from_session(session_id):
-    AUTH_SERVICE_URL = get_service_url('auth-service')
-    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
-    if user_id_response.status_code != 200:
-        abort(user_id_response.status_code, user_id_response.text)
-    return user_id_response.json().get("user_id")
 
 # todo only admin (no regular users) can do create_event() or delete_event
 @events_bp.route("/", methods=["POST"])

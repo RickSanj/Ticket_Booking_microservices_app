@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api-gateway /usr/src/app
 COPY auth-service/templates /usr/src/app/templates
+COPY event-service/templates /usr/src/app/templates
 COPY custom_consul /usr/src/app/custom_consul
 
 EXPOSE 8080
