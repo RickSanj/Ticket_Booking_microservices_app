@@ -30,17 +30,6 @@ def wait_for_postgres(host, port, user, password, db, retries=10, delay=3):
     raise Exception("❌ PostgreSQL is still not ready after retries.")
 
 
-# consul = ConsulServiceRegistry(consul_host='consul-server', consul_port=8500)
-# consul.wait_for_consul()
-# discovered_services = consul.discover_service('postgres-authorization')
-# print(discovered_services, flush=True)
-
-# if discovered_services:
-#     POSTGRES_HOST = discovered_services[0]['address']
-#     POSTGRES_PORT = discovered_services[0]['port']
-# else:
-#     raise Exception("postgres-authorization service not found in Consul")
-
 wait_for_postgres(
     host="postgres-authorization",
     port=5432,
@@ -83,10 +72,10 @@ def get_user_ids():
     postgres_cursor.execute("SELECT user_id FROM logging_password")
     return [row[0] for row in postgres_cursor.fetchall()]
 
-def register_user(username, password):
+def register_user(username, password, admin):
     new_id = max(get_user_ids(), default=0) + 1
     hashed_pw = bcrypt.hash(password)
-    postgres_cursor.execute("INSERT INTO logging_password VALUES (%s, %s, %s)", (username, hashed_pw, new_id))
+    postgres_cursor.execute("INSERT INTO logging_password VALUES (%s, %s, %s, %s)", (username, hashed_pw, admin, new_id))
     postgres_conn.commit()
 
 def user_exists(username):
@@ -122,7 +111,7 @@ def register():
     if user_exists(email):
         abort(409, "Email already registered")
 
-    register_user(email, password)
+    register_user(email, password, False)
     return jsonify({"message": "User registered"}), 201
 
 @app.route("/login", methods=["POST"])
@@ -170,4 +159,6 @@ def register_service_consul(port):
 if __name__ == "__main__":
     PORT = 6000
     register_service_consul(PORT)
+    register_user("admin@admin", "admin", True)
+
     app.run(host="0.0.0.0", port=PORT, debug=True)

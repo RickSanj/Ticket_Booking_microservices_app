@@ -1,3 +1,3 @@
 docker compose up -d --build
 
-bash populate.sh
+bash ./bash-scripts/populate.sh
