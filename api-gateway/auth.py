@@ -8,13 +8,12 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 
 # Function to get auth service URL via Consul
-def get_event_URL():
+def get_event_URL(service_name):
     consul = ConsulServiceRegistry(
         consul_host='consul-server', consul_port=8500
     )
     consul.wait_for_consul()
 
-    service_name = 'auth-service'
     discovered_services = consul.discover_service(service_name)
     print(discovered_services, flush=True)
 
@@ -43,7 +42,7 @@ def register_form():
 # POST /auth/register - submit registration
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    AUTH_SERVICE_URL = get_event_URL()
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
     email = request.form["email"]
     password = request.form["password"]
 
@@ -72,7 +71,7 @@ def login_form():
 # POST /auth/login - submit login
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    AUTH_SERVICE_URL = get_event_URL()
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
     email = request.form["email"]
     password = request.form["password"]
 
@@ -100,7 +99,7 @@ def main():
     if not session_id:
         abort(401, "No session")
 
-    AUTH_SERVICE_URL = get_event_URL()
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
 
     user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
 
@@ -119,7 +118,7 @@ def main():
 @auth_bp.route("/logout", methods=["GET"])
 def logout():
     session_id = request.cookies.get("session_id")
-    AUTH_SERVICE_URL = get_event_URL()
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
 
     if session_id:
         requests.delete(f"{AUTH_SERVICE_URL}/delete_session/{session_id}")
