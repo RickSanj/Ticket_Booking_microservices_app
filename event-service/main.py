@@ -10,12 +10,11 @@ import time
 import requests
 import random
 
-def get_booking_URL():
+def get_service_url(service_name):
     consul = ConsulServiceRegistry(
         consul_host='consul-server', consul_port=8500)
     consul.wait_for_consul()
 
-    service_name = 'booking-service'
     discovered_services = consul.discover_service(service_name)
     print(discovered_services, flush=True)
 
@@ -114,7 +113,7 @@ def create_event(db, data):
 
     try:
         response = requests.post(
-            f"{get_booking_URL()}/create_seats",
+            f"{get_service_url('booking-service')}/create_seats",
             json={"event_id": event_id, "num_seats": num_seats},
             timeout=5
         )
@@ -137,7 +136,7 @@ def delete_event(db, event_id):
 
     try:
         response = requests.delete(
-            f"{get_booking_URL()}/delete_seats/{event_id}",
+            f"{get_service_url('booking-service')}/delete_seats/{event_id}",
             timeout=5
         )
 
