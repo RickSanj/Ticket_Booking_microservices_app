@@ -110,6 +110,12 @@ def connect_to_cassandra():
     client.connect()
     return client
 
+def get_user_id_from_session(session_id):
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
+    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
+    if user_id_response.status_code != 200:
+        abort(user_id_response.status_code, user_id_response.text)
+    return user_id_response.json().get("user_id")
 
 def connect_to_redis():
     REDIS_CONFIG = {
@@ -119,7 +125,6 @@ def connect_to_redis():
         "password": "pass"
     }
     return redis.Redis(**REDIS_CONFIG, decode_responses=True)
-
 
 def register_service_consul(port):
     consul = ConsulServiceRegistry(
@@ -221,13 +226,6 @@ def delete_seats(event_id):
     except Exception as e:
         return jsonify({"error": f"Failed to delete seats: {str(e)}"}), 500
 
-
-def get_user_id_from_session(session_id):
-    AUTH_SERVICE_URL = get_event_URL('auth-service')
-    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
-    if user_id_response.status_code != 200:
-        abort(user_id_response.status_code, user_id_response.text)
-    return user_id_response.json().get("user_id")
 
 @app.route("/book", methods=["POST"])
 def book_seat():
