@@ -5,12 +5,11 @@ from custom_consul.consul_ import ConsulServiceRegistry
 
 events_bp = Blueprint('events', __name__)
 
-def get_event_URL():
+def get_service_url(service_name):
     consul = ConsulServiceRegistry(
         consul_host='consul-server', consul_port=8500)
     consul.wait_for_consul()
 
-    service_name = 'event-service'
     discovered_services = consul.discover_service(service_name)
     print(discovered_services, flush=True)
 
@@ -27,7 +26,7 @@ def get_event_URL():
 @events_bp.route("/", methods=["GET"])
 def handle_events():
     event_id = request.args.get("event_id")
-    EVENT_SERVICE_URL = get_event_URL()
+    EVENT_SERVICE_URL = get_service_url("event-service")
 
     if event_id:
         print("Fetching single event", flush=True)
@@ -43,7 +42,7 @@ def handle_events():
 
 
 def get_user_id_from_session(session_id):
-    AUTH_SERVICE_URL = get_event_URL('auth-service')
+    AUTH_SERVICE_URL = get_service_url('auth-service')
     user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
     if user_id_response.status_code != 200:
         abort(user_id_response.status_code, user_id_response.text)
@@ -55,7 +54,7 @@ def create_event():
     session_id = request.cookies.get("session_id")
 
     user_id: int = get_user_id_from_session(session_id)
-    AUTH_SERVICE_URL = get_event_URL('auth-service')
+    AUTH_SERVICE_URL = get_service_url('auth-service')
 
     is_admin_response = requests.get(f"{AUTH_SERVICE_URL}/is_admin/{user_id}")
     user_admin: bool = is_admin_response.json().get("is_admin")
@@ -63,7 +62,7 @@ def create_event():
     if not user_admin:
         abort(403, "Only admin can create events")
 
-    EVENT_SERVICE_URL = get_event_URL()
+    EVENT_SERVICE_URL = get_service_url("event-service")
     data = request.get_json()
 
     if not data or "title" not in data or "date_time" not in data or "venue" not in data or "performer" not in data:
@@ -82,7 +81,7 @@ def delete_event(event_id):
     session_id = request.cookies.get("session_id")
 
     user_id: int = get_user_id_from_session(session_id)
-    AUTH_SERVICE_URL = get_event_URL('auth-service')
+    AUTH_SERVICE_URL = get_service_url('auth-service')
 
     is_admin_response = requests.get(f"{AUTH_SERVICE_URL}/is_admin/{user_id}")
     user_admin: bool = is_admin_response.json().get("is_admin")
@@ -90,7 +89,7 @@ def delete_event(event_id):
     if not user_admin:
         abort(403, "Only admin can delete events")
 
-    EVENT_SERVICE_URL = get_event_URL()
+    EVENT_SERVICE_URL = get_service_url("event-service")
 
     try:
         res = requests.delete(f"{EVENT_SERVICE_URL}/events/{event_id}")
