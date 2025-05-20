@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Available Shows</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        .event {
+            background: white;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .event h2 {
+            margin: 0;
+        }
+        .event p {
+            margin: 0.5rem 0;
+        }
+        .select-button {
+            display: inline-block;
+            margin-top: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .select-button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Available Shows</h1>
+        {% for event in events %}
+        <div class="event">
+            <h2>{{ event.title }}</h2>
+            <p><strong>Date:</strong> {{ event.date_time }}</p>
+            <p><strong>Venue:</strong> {{ event.venue }}</p>
+            <p><strong>Performer:</strong> {{ event.performer }}</p>
+            <a class="select-button" href="/booking/{{ event.id }}">Select</a>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>
