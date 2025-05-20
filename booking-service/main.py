@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify, Blueprint
+from flask import Flask, request, jsonify, abort
 from flask_cors import CORS
+import requests
 import argparse
 from datetime import datetime
 from custom_consul.consul_ import ConsulServiceRegistry
@@ -87,6 +88,22 @@ class CassandraClient:
         query = f"DELETE FROM {table_name} WHERE {where_clause};"
         self.session.execute(query, values)
 
+def get_event_URL(service_name):
+    consul = ConsulServiceRegistry(
+        consul_host='consul-server', consul_port=8500
+    )
+    consul.wait_for_consul()
+
+    discovered_services = consul.discover_service(service_name)
+    print(discovered_services, flush=True)
+
+    if not discovered_services:
+        raise Exception(f"{service_name} service not found in Consul")
+
+    node = random.choice(discovered_services)
+    address = node['address']
+    port = node['port']
+    return f"http://{address}:{port}"
 
 def connect_to_cassandra():
     client = CassandraClient("cassandra_node", 9042, KEYSPACE)
@@ -205,13 +222,22 @@ def delete_seats(event_id):
         return jsonify({"error": f"Failed to delete seats: {str(e)}"}), 500
 
 
+def get_user_id_from_session(session_id):
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
+    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
+    if user_id_response.status_code != 200:
+        abort(user_id_response.status_code, user_id_response.text)
+    return user_id_response.json().get("user_id")
 
 @app.route("/book", methods=["POST"])
 def book_seat():
+    session_id = request.cookies.get("session_id")
+
     data = request.json
     event_id = data["event_id"]
     ticket_id = data["ticket_id"]
-    user_id = data["user_id"]  # TODO get user_id from session
+
+    user_id: int = get_user_id_from_session(session_id)
 
     redis_key = f"{TICKET_LOCK_PREFIX}:{event_id}:{ticket_id}"
     if redis_client.exists(redis_key):

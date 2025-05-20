@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, abort
 import requests
 import random
 from custom_consul.consul_ import ConsulServiceRegistry
@@ -42,9 +42,27 @@ def handle_events():
         return jsonify({"error": "Invalid response from event-service"}), 500
 
 
+def get_user_id_from_session(session_id):
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
+    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
+    if user_id_response.status_code != 200:
+        abort(user_id_response.status_code, user_id_response.text)
+    return user_id_response.json().get("user_id")
+
 # todo only admin (no regular users) can do create_event() or delete_event
 @events_bp.route("/", methods=["POST"])
 def create_event():
+    session_id = request.cookies.get("session_id")
+
+    user_id: int = get_user_id_from_session(session_id)
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
+
+    is_admin_response = requests.get(f"{AUTH_SERVICE_URL}/is_admin/{user_id}")
+    user_admin: bool = is_admin_response.json().get("is_admin")
+
+    if not user_admin:
+        abort(403, "Only admin can create events")
+
     EVENT_SERVICE_URL = get_event_URL()
     data = request.get_json()
 
@@ -61,6 +79,17 @@ def create_event():
 
 @events_bp.route("/<int:event_id>", methods=["DELETE"])
 def delete_event(event_id):
+    session_id = request.cookies.get("session_id")
+
+    user_id: int = get_user_id_from_session(session_id)
+    AUTH_SERVICE_URL = get_event_URL('auth-service')
+
+    is_admin_response = requests.get(f"{AUTH_SERVICE_URL}/is_admin/{user_id}")
+    user_admin: bool = is_admin_response.json().get("is_admin")
+
+    if not user_admin:
+        abort(403, "Only admin can delete events")
+
     EVENT_SERVICE_URL = get_event_URL()
 
     try:
