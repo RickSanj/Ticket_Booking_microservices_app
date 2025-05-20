@@ -1,1 +1,0 @@
-docker exec kafka-payment kafka-topics --bootstrap-server localhost:9092 --topic payments --create --partitions 3 --replication-factor 1

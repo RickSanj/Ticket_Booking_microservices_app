@@ -63,6 +63,14 @@ def get_user_password(username):
     record = postgres_cursor.fetchone()
     return record[0] if record else None
 
+
+@app.route("/is_admin/<user_id>", methods=["GET"])
+def is_admin(user_id):
+    postgres_cursor.execute("SELECT admin FROM logging_password WHERE user_id = %s", (user_id,))
+    record = postgres_cursor.fetchone()
+
+    return  jsonify({"is_admin": record[0] if record else False}), 200
+
 def get_user_id(username):
     postgres_cursor.execute("SELECT user_id FROM logging_password WHERE login = %s", (username,))
     record = postgres_cursor.fetchone()
@@ -127,14 +135,14 @@ def login():
     session_id = create_session(get_user_id(email))
     return jsonify({"session_id": session_id}), 200
 
-@app.route("/session/<session_id>", methods=["GET"])
+@app.route("/get_user_id/<session_id>", methods=["GET"])
 def session_info(session_id):
     user_id = get_userid_by_session(session_id)
     if not user_id:
         abort(401, "Invalid or expired session")
     return jsonify({"user_id": user_id}), 200
 
-@app.route("/session/<session_id>", methods=["DELETE"])
+@app.route("/delete_session/<session_id>", methods=["DELETE"])
 def session_delete(session_id):
     delete_session(session_id)
     return jsonify({"message": "Session deleted"}), 200

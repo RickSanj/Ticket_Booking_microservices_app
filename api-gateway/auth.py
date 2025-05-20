@@ -101,13 +101,17 @@ def main():
         abort(401, "No session")
 
     AUTH_SERVICE_URL = get_event_URL()
-    res = requests.get(f"{AUTH_SERVICE_URL}/session/{session_id}")
+    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
 
-    if res.status_code != 200:
-        abort(res.status_code, res.text)
+    if user_id_response.status_code != 200:
+        abort(user_id_response.status_code, user_id_response.text)
 
-    user_id = res.json().get("user_id")
-    return f"<h2>Welcome user #{user_id}!</h2>"
+    user_id: int = user_id_response.json().get("user_id")
+
+    is_admin_response = requests.get(f"{AUTH_SERVICE_URL}/is_admin/{user_id}")
+    user_admin: bool = is_admin_response.json().get("is_admin")
+
+    return f"<h2>Welcome user #{user_id} is admin bool {user_admin}!</h2>"
 
 
 # GET /auth/logout - logout and redirect to login
@@ -117,7 +121,7 @@ def logout():
     AUTH_SERVICE_URL = get_event_URL()
 
     if session_id:
-        requests.delete(f"{AUTH_SERVICE_URL}/session/{session_id}")
+        requests.delete(f"{AUTH_SERVICE_URL}/delete_session/{session_id}")
 
     resp = make_response(redirect(url_for('auth.login_form')))
     resp.delete_cookie("session_id")
