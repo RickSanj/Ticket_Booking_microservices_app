@@ -29,14 +29,7 @@ def get_event_URL(service_name):
 # GET /auth/register - show registration form
 @auth_bp.route("/register", methods=["GET"])
 def register_form():
-    return render_template_string("""
-    <h2>Register</h2>
-    <form action="{{ url_for('auth.register') }}" method="post">
-      Email: <input type="email" name="email" required><br>
-      Password: <input type="password" name="password" required><br>
-      <input type="submit" value="Register">
-    </form>
-    """)
+    return render_template("register.html")
 
 
 # POST /auth/register - submit registration
@@ -58,14 +51,7 @@ def register():
 # GET /auth/login - show login form
 @auth_bp.route("/login", methods=["GET"])
 def login_form():
-    return render_template_string("""
-    <h2>Login</h2>
-    <form action="{{ url_for('auth.login') }}" method="post">
-      Email: <input type="email" name="email" required><br>
-      Password: <input type="password" name="password" required><br>
-      <input type="submit" value="Login">
-    </form>
-    """)
+    return render_template("login.html")
 
 
 # POST /auth/login - submit login
