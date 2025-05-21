@@ -295,8 +295,8 @@ def book_seat():
 @app.route("/confirm", methods=["POST"])
 def confirm_booking():
     data = request.json
-    event_id = data["event_id"]
-    ticket_id = data["ticket_id"]
+    event_id = int(data["event_id"])
+    ticket_id = int(data["ticket_id"])
     user_id = data["user_id"]
 
     redis_key = f"{TICKET_LOCK_PREFIX}:{event_id}:{ticket_id}"
@@ -310,7 +310,7 @@ def confirm_booking():
     cassandra_client.session.execute("""
         INSERT INTO bookings (event_id, ticket_id, user_id, booking_time)
         VALUES (%s, %s, %s, toTimestamp(now()))
-    """, (event_id, ticket_id, user_id))
+    """, (event_id, ticket_id, int(user_id)))
 
     return jsonify({"message": "Booking confirmed!"})
 
