@@ -11,7 +11,6 @@ import redis
 import random
 
 KEYSPACE = "bookings_db"
-#todo make sure user can only book tickets if is logged in
 
 class CassandraClient:
     def __init__(self, host, port, keyspace):
@@ -233,7 +232,6 @@ def book_seat():
     data = request.json
     event_id = data["event_id"]
     ticket_id = data["ticket_id"]
-
     user_id: int = get_user_id_from_session(session_id)
 
     redis_key = f"{TICKET_LOCK_PREFIX}:{event_id}:{ticket_id}"

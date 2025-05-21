@@ -71,6 +71,7 @@
             const lockRes = await fetch('/booking/book', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({
                     event_id: eventId,
                     ticket_id: selectedTicket.ticket_id

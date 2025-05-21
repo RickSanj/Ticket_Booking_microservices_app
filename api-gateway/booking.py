@@ -1,5 +1,5 @@
 import random
-from flask import Blueprint, request, jsonify, abort, render_template
+from flask import Blueprint, request, jsonify, abort, render_template, make_response
 import requests
 from custom_consul.consul_ import ConsulServiceRegistry
 
@@ -45,6 +45,8 @@ def create_booking():
 @booking_bp.route('/<int:event_id>')
 def booking_page(event_id):
     session_id = request.cookies.get("session_id")
+    if not session_id:
+        abort(401, "Session ID not found in cookies")
 
     AUTH_SERVICE_URL = get_service_url('auth-service')
 
@@ -55,7 +57,10 @@ def booking_page(event_id):
 
     user_id: int = user_id_response.json().get("user_id")
 
-    return render_template('booking.html', event_id=event_id, user_id=user_id)
+    response = make_response(render_template('booking.html', event_id=event_id, user_id=user_id))
+    response.set_cookie('session_id', session_id, httponly=True, samesite='Lax')
+
+    return response
 
 # @booking_bp.route("/<booking_id>", methods=["PUT"])
 # def update_booking(booking_id):
@@ -77,12 +82,18 @@ def get_available_seats(event_id):
 
 @booking_bp.route("/book", methods=["POST"])
 def book_seat():
-    session_id = request.cookies.get("session_id")
+    session_id = request.cookies.get("session_id") # is passed correctly
+    if not session_id:
+        abort(401, "Session ID not found in cookies")
+    cookies = {'session_id': session_id}
+
     if not session_id:
         abort(401, "No session")
     data = request.get_json()
     booking_service_url = get_service_url('booking-service')
-    res = requests.post(f"{booking_service_url}/book", json=data)
+
+    res = requests.post(f"{booking_service_url}/book", json=data, cookies=cookies)
+
     return jsonify(res.json()), res.status_code
 
 
