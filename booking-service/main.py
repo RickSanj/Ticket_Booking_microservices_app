@@ -1,16 +1,28 @@
-from flask import Flask, request, jsonify, abort
-from flask_cors import CORS
-import requests
 import argparse
-from datetime import datetime
-from custom_consul.consul_ import ConsulServiceRegistry
-from cassandra.cluster import Cluster
+import json
+import random
 import socket
 import time
+from datetime import datetime
+
 import redis
-import random
+import requests
+from cassandra.cluster import Cluster
+from confluent_kafka import Producer
+from flask import Flask, request, jsonify, abort
+from flask_cors import CORS
+
+
+from custom_consul.consul_ import ConsulServiceRegistry
+
 
 KEYSPACE = "bookings_db"
+KAFKA_CONF = {
+    'bootstrap.servers': 'kafka-payment:19092'
+}
+KAFKA_TOPIC = "payments"
+
+producer = Producer(KAFKA_CONF)
 
 class CassandraClient:
     def __init__(self, host, port, keyspace):
@@ -108,6 +120,38 @@ def connect_to_cassandra():
     client = CassandraClient("cassandra_node", 9042, KEYSPACE)
     client.connect()
     return client
+
+def is_ticket_locked(event_id: str, ticket_id: str) -> bool:
+    redis_key = f"{TICKET_LOCK_PREFIX}:{event_id}:{ticket_id}"
+    return redis_client.exists(redis_key)
+
+
+def lock_ticket(event_id: str, ticket_id: str, user_id: int):
+    redis_key = f"{TICKET_LOCK_PREFIX}:{event_id}:{ticket_id}"
+    redis_client.set(redis_key, user_id, ex=LOCK_TTL_SECONDS)
+
+
+def send_booking_event(event_id: str, ticket_id: str, user_id: int, amount: int):
+    message = {
+        "event_id": event_id,
+        "ticket_id": ticket_id,
+        "user_id": user_id,
+        "amount": amount
+    }
+
+    def delivery_report(err, msg):
+        if err is not None:
+            print(f"Delivery failed: {err}")
+        else:
+            print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+
+    producer.produce(
+        topic=KAFKA_TOPIC,
+        value=json.dumps(message),
+        callback=delivery_report
+    )
+    producer.flush()
+
 
 def get_user_id_from_session(session_id):
     AUTH_SERVICE_URL = get_service_url('auth-service')
@@ -224,28 +268,30 @@ def delete_seats(event_id):
     except Exception as e:
         return jsonify({"error": f"Failed to delete seats: {str(e)}"}), 500
 
-
 @app.route("/book", methods=["POST"])
 def book_seat():
     session_id = request.cookies.get("session_id")
+    user_id = get_user_id_from_session(session_id)
 
-    data = request.json
-    event_id = data["event_id"]
-    ticket_id = data["ticket_id"]
-    user_id: int = get_user_id_from_session(session_id)
+    try:
+        data = request.get_json()
+        event_id = data["event_id"]
+        ticket_id = data["ticket_id"]
+        amount = data["amount"]
+    except (TypeError, KeyError):
+        return jsonify({"error": "Invalid request payload"}), 400
 
-    redis_key = f"{TICKET_LOCK_PREFIX}:{event_id}:{ticket_id}"
-    if redis_client.exists(redis_key):
+    if is_ticket_locked(event_id, ticket_id):
         return jsonify({"error": "Ticket temporarily locked or already booked"}), 409
 
-    redis_client.set(redis_key, user_id, ex=LOCK_TTL_SECONDS)
+    lock_ticket(event_id, ticket_id, user_id)
+    send_booking_event(event_id, ticket_id, user_id, amount)
 
-    # payment_url = #TODO redirect user to payment service
+    return jsonify({
+        "message": "Seat locked. Proceed to payment",
+        "ticket_id": ticket_id
+    }), 200
 
-    return jsonify({"message": "Seat locked. Proceed to payment", "ticket_id": ticket_id})
-
-
-# TODO use this function when user successfully paid. Should be called when consumer(booking) received message from MQ send by payment service  (deletes temporary lock from redis and writes permanent booking betails to cassandra)
 @app.route("/confirm", methods=["POST"])
 def confirm_booking():
     data = request.json

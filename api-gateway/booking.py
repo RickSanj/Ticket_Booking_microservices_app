@@ -62,17 +62,6 @@ def booking_page(event_id):
 
     return response
 
-# @booking_bp.route("/<booking_id>", methods=["PUT"])
-# def update_booking(booking_id):
-#     data = request.get_json()
-#     try:
-#         booking_service_url = get_service_url('booking-service')
-#         res = requests.put(f"{booking_service_url}/{booking_id}", json=data)
-#         return jsonify(res.json()), res.status_code
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
-
 @booking_bp.route("/available_seats/<event_id>", methods=["GET"])
 def get_available_seats(event_id):
     booking_service_url = get_service_url('booking-service')

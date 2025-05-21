@@ -74,20 +74,12 @@
                 credentials: 'include',
                 body: JSON.stringify({
                     event_id: eventId,
-                    ticket_id: selectedTicket.ticket_id
+                    ticket_id: selectedTicket.ticket_id,
+                    amount: selectedTicket.price
                 })
             });
 
             if (lockRes.ok) {
-                await fetch('/payment/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        concert_id: eventId,
-                        ticket_id: selectedTicket.ticket_id,
-                        user_id: userId
-                    })
-                });
                 alert('Ticket booked and payment request sent!');
             } else {
                 alert('Failed to book ticket. It may have been taken.');

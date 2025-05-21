@@ -215,8 +215,6 @@ def create_routes(db):
     return event_bp
 
 
-# Main entry point for the application
-
 def main():
     parser = argparse.ArgumentParser(
         description="Run event service on a specified port.")
