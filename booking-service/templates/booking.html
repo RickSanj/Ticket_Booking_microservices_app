@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Book Tickets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-3xl mx-auto bg-white shadow-lg p-6 rounded-xl">
+        <h1 class="text-2xl font-bold mb-4">Available Tickets</h1>
+        <div id="ticket-list" class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3"></div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
+            <p class="mb-4 text-lg" id="modal-text">Are you sure you want to book this ticket?</p>
+            <div class="flex justify-end gap-4">
+                <button id="cancel-btn" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">No</button>
+                <button id="confirm-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const eventId = {{ event_id }};
+        const userId = {{user_id}};
+
+        let selectedTicket = null;
+
+        async function fetchTickets() {
+            const res = await fetch(`/booking/available_seats/${eventId}`);
+            const tickets = await res.json();
+            renderTickets(tickets);
+        }
+
+        function renderTickets(tickets) {
+            const container = document.getElementById('ticket-list');
+            container.innerHTML = '';
+
+            tickets.forEach(ticket => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border rounded-lg p-4 shadow flex flex-col justify-between';
+                card.innerHTML = `
+                    <p><strong>Seat:</strong> ${ticket.seat_number}</p>
+                    <p><strong>Price:</strong> $${ticket.price.toFixed(2)}</p>
+                    <button class="mt-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600" 
+                            onclick='selectTicket(${ticket.ticket_id}, "${ticket.seat_number}", ${ticket.price})'>
+                        Select
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function selectTicket(ticketId, seatNumber, price) {
+            selectedTicket = { ticket_id: ticketId, seat: seatNumber, price: price };
+            document.getElementById('modal-text').innerText = 
+                `Are you sure you want to book seat ${seatNumber} for $${price}?`;
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            selectedTicket = null;
+            document.getElementById('modal').classList.add('hidden');
+        });
+
+        document.getElementById('confirm-btn').addEventListener('click', async () => {
+            if (!selectedTicket) return;
+
+            const lockRes = await fetch('/booking/book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_id: eventId,
+                    ticket_id: selectedTicket.ticket_id
+                })
+            });
+
+            if (lockRes.ok) {
+                await fetch('/payment/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        concert_id: eventId,
+                        ticket_id: selectedTicket.ticket_id,
+                        user_id: userId
+                    })
+                });
+                alert('Ticket booked and payment request sent!');
+            } else {
+                alert('Failed to book ticket. It may have been taken.');
+            }
+
+            selectedTicket = null;
+            document.getElementById('modal').classList.add('hidden');
+            fetchTickets();  // refresh seats
+        });
+
+        fetchTickets();
+    </script>
+</body>
+</html>

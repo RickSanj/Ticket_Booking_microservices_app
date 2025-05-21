@@ -1,5 +1,5 @@
 import random
-from flask import Blueprint, request, jsonify, abort
+from flask import Blueprint, request, jsonify, abort, render_template
 import requests
 from custom_consul.consul_ import ConsulServiceRegistry
 
@@ -12,7 +12,7 @@ def get_service_url(service_name):
     consul.wait_for_consul()
 
     discovered_services = consul.discover_service(service_name)
-    print(discovered_services, flush=True)
+    # print(discovered_services, flush=True)
 
     if discovered_services:
         node = random.choice(discovered_services)
@@ -33,25 +33,39 @@ def create_booking():
         return jsonify({"error": str(e)}), 500
 
 
-@booking_bp.route("/<user_id>", methods=["GET"])
-def get_user_bookings(user_id):
-    try:
-        booking_service_url = get_service_url('booking-service')
-        res = requests.get(f"{booking_service_url}/{user_id}")
-        return jsonify(res.json()), res.status_code
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# @booking_bp.route("/<user_id>", methods=["GET"])
+# def get_user_bookings(user_id):
+#     try:
+#         booking_service_url = get_service_url('booking-service')
+#         res = requests.get(f"{booking_service_url}/{user_id}")
+#         return jsonify(res.json()), res.status_code
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
+@booking_bp.route('/<int:event_id>')
+def booking_page(event_id):
+    session_id = request.cookies.get("session_id")
 
-@booking_bp.route("/<booking_id>", methods=["PUT"])
-def update_booking(booking_id):
-    data = request.get_json()
-    try:
-        booking_service_url = get_service_url('booking-service')
-        res = requests.put(f"{booking_service_url}/{booking_id}", json=data)
-        return jsonify(res.json()), res.status_code
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    AUTH_SERVICE_URL = get_service_url('auth-service')
+
+    user_id_response = requests.get(f"{AUTH_SERVICE_URL}/get_user_id/{session_id}")
+
+    if user_id_response.status_code != 200:
+        abort(user_id_response.status_code, user_id_response.text)
+
+    user_id: int = user_id_response.json().get("user_id")
+
+    return render_template('booking.html', event_id=event_id, user_id=user_id)
+
+# @booking_bp.route("/<booking_id>", methods=["PUT"])
+# def update_booking(booking_id):
+#     data = request.get_json()
+#     try:
+#         booking_service_url = get_service_url('booking-service')
+#         res = requests.put(f"{booking_service_url}/{booking_id}", json=data)
+#         return jsonify(res.json()), res.status_code
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 
 @booking_bp.route("/available_seats/<event_id>", methods=["GET"])
